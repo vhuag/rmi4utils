@@ -35,7 +35,7 @@
 
 #include "hiddevice.h"
 
-#define RMI4UPDATE_GETOPTS      "hp:ir:w:foambd:ecnt:"
+#define RMI4UPDATE_GETOPTS      "hp:ir:w:foambd:ecnt:s:g:"
 
  enum rmihidtool_cmd {
 	RMIHIDTOOL_CMD_INTERACTIVE,
@@ -49,6 +49,8 @@
 	RMIHIDTOOL_CMD_REBIND_DRIVER,
 	RMIHIDTOOL_CMD_PRINT_DEVICE_INFO,
 	RMIHIDTOOL_CMD_RESET_DEVICE,
+	RMIHIDTOOL_CMD_SET_FEATURE,
+	RMIHIDTOOL_CMD_GET_FEATURE,
 };
 
 static int report_attn = 0;
@@ -72,6 +74,8 @@ void print_help(const char *prog_name)
 	fprintf(stdout, "\t-n, --device-info\t\t\tPrint protocol specific information about the device.\n");
 	fprintf(stdout, "\t-e, --reset-device\t\t\tReset the device.\n");
 	fprintf(stdout, "\t-t, --device-type\t\t\tFilter by device type [touchpad or touchscreen].\n");
+	fprintf(stdout, "\t-s, --set-feature [report number] [data]\t\t\tSet HID feature..\n");
+	fprintf(stdout, "\t-g, --get-feature [report number] [length]\t\t\tGet HID feature..\n");
 }
 
 void print_cmd_usage()
@@ -230,6 +234,8 @@ int main(int argc, char ** argv)
 		{"device-info", 0, NULL, 'n'},
 		{"reset-device", 0, NULL, 'e'},
 		{"device-type", 1, NULL, 't'},
+		{"set-feature", 1, NULL, 's'},
+		{"get-feature", 1, NULL, 'g'},
 		{0, 0, 0, 0},
 	};
 	enum rmihidtool_cmd cmd = RMIHIDTOOL_CMD_INTERACTIVE;
@@ -239,6 +245,7 @@ int main(int argc, char ** argv)
 	char * start;
 	char * end;
 	int i = 0;
+	unsigned int report_number = 0;
 
 	memset(&sig_cleanup_action, 0, sizeof(struct sigaction));
 	sig_cleanup_action.sa_handler = cleanup;
@@ -298,6 +305,16 @@ int main(int argc, char ** argv)
 					deviceType = RMI_DEVICE_TYPE_TOUCHPAD;
 				else if (!strcasecmp(optarg, "touchscreen"))
 					deviceType = RMI_DEVICE_TYPE_TOUCHSCREEN;
+				break;
+		    case 's':
+				cmd = RMIHIDTOOL_CMD_SET_FEATURE;
+				report_number = strtol(optarg, NULL, 0);
+				data = argv[optind++];
+				break;
+		    case 'g':
+				cmd = RMIHIDTOOL_CMD_GET_FEATURE;
+				report_number = strtol(optarg, NULL, 0);
+				len = strtol(argv[optind++], NULL, 0);
 				break;
 			default:
 				print_help(argv[0]);
@@ -398,6 +415,35 @@ int main(int argc, char ** argv)
 		case RMIHIDTOOL_CMD_RESET_DEVICE:
 			device->ScanPDT();
 			device->Reset();
+			break;
+	    case RMIHIDTOOL_CMD_SET_FEATURE:
+			i = 0;
+			start = data;
+			memset(report, 0, sizeof(report));
+			report[i++] = report_number;
+			++len;
+			while (find_token(start, token, sizeof(token), &end)) {
+				start = end;
+				report[i++] = (unsigned char)strtol(token, NULL, 0);
+				++len;
+			}
+			
+			printf("set feature length= %d\n", len);
+			print_buffer(report, len);
+			printf("============\n");
+			if (device->SetFeature(len, report) < 0) {
+				fprintf(stderr, "Failed to Set Feature\n");
+				return -1;
+			}
+			break;
+	    case RMIHIDTOOL_CMD_GET_FEATURE:
+			memset(report, 0, sizeof(report));
+			report[0] = report_number;
+			printf("report number is 0x%x \n", report_number);
+			rc = device->GetFeature(len, report);
+			if (rc < 0)
+				fprintf(stderr, "Failed to get feature: %d\n", rc);
+			print_buffer(report, len);
 			break;
 		case RMIHIDTOOL_CMD_INTERACTIVE:
 		default:

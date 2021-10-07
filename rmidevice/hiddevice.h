@@ -61,6 +61,8 @@ public:
 
 	virtual bool FindDevice(enum RMIDeviceType type = RMI_DEVICE_TYPE_ANY);
 	virtual bool CheckABSEvent();
+	virtual int SetFeature(uint32_t length, uint8_t* buf);
+	virtual int GetFeature(uint32_t length, uint8_t* buf);
 
 private:
 	int m_fd;

@@ -55,6 +55,9 @@ public:
 	virtual void Cancel() { m_bCancel = true; }
 	virtual void RebindDriver() = 0;
 	virtual bool CheckABSEvent() = 0;
+	virtual int SetFeature(unsigned int length, unsigned char* buf) = 0;
+	virtual int GetFeature(unsigned int length, unsigned char* buf) = 0;
+
 
 	unsigned long GetFirmwareID() { return m_buildID; }
 	unsigned long GetConfigID() { return m_configID; }

@@ -405,6 +405,38 @@ int HIDDevice::SetMode(int mode)
 
 	return 0;
 }
+int HIDDevice::SetFeature(unsigned int length, unsigned char* buf)
+{
+	int rc;
+
+	if (!m_deviceOpen)
+		return -1;
+
+	rc = ioctl(m_fd, HIDIOCSFEATURE(length), buf);
+	if (rc < 0) {
+		perror("HIDIOCSFEATURE");
+		return rc;
+	}
+
+	return rc;
+}
+int HIDDevice::GetFeature(unsigned int length, unsigned char* buf)
+{
+	int rc;
+
+	if (!m_deviceOpen)
+		return -1;
+
+	rc = ioctl(m_fd, HIDIOCGFEATURE(length), buf);
+	if (rc < 0) {
+		perror("HIDIOCGFEATURE");
+		return rc;
+	}
+
+	return rc;
+}
+
+
 
 void HIDDevice::Close()
 {

@@ -73,27 +73,27 @@ int HIDDevice::Open(const char * filename)
 
 	if (!filename)
 		return -EINVAL;
-
+	fprintf(stdout, "open dev %s \n", filename.c_str());
 	m_fd = open(filename, O_RDWR);
 	if (m_fd < 0)
 		return -1;
-
+	fprintf(stdout, "opened dev %s \n", filename.c_str());
 	memset(&m_rptDesc, 0, sizeof(m_rptDesc));
 	memset(&m_info, 0, sizeof(m_info));
 
 	rc = ioctl(m_fd, HIDIOCGRDESCSIZE, &desc_size);
 	if (rc < 0)
 		goto error;
-	
+	fprintf(stdout, "open2 dev %s \n", filename.c_str());
 	m_rptDesc.size = desc_size;
 	rc = ioctl(m_fd, HIDIOCGRDESC, &m_rptDesc);
 	if (rc < 0)
 		goto error;
-	
+	fprintf(stdout, "open3 dev %s \n", filename.c_str());
 	rc = ioctl(m_fd, HIDIOCGRAWINFO, &m_info);
 	if (rc < 0)
 		goto error;
-
+	fprintf(stdout, "open4 dev %s \n", filename.c_str());
 	if (m_info.vendor != SYNAPTICS_VENDOR_ID) {
 		errno = -ENODEV;
 		rc = -1;

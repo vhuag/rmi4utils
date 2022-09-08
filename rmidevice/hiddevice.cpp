@@ -102,7 +102,8 @@ int HIDDevice::Open(const char * filename)
 	fprintf(stdout, "bus type is %d \n", m_info.bustype);
 
 	ParseReportDescriptor();
-
+	m_inputReportSize = 0x3d;
+	m_outputReportSize = 0x14;
 	m_inputReport = new unsigned char[m_inputReportSize]();
 	if (!m_inputReport) {
 		errno = -ENOMEM;

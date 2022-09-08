@@ -99,7 +99,7 @@ int HIDDevice::Open(const char * filename)
 		rc = -1;
 		goto error;
 	}
-	fprintf(stdout, "bus type is %d : ", m_info.bustype);
+	fprintf(stdout, "bus type is %d \n", m_info.bustype);
 
 	ParseReportDescriptor();
 
@@ -169,6 +169,7 @@ void HIDDevice::ParseReportDescriptor()
 	bool inCollection = false;
 
 	for (unsigned int i = 0; i < m_rptDesc.size; ++i) {
+		fprintf(stdout, "0x%x: ", m_rptDesc.value[i]);
 		if (m_rptDesc.value[i] == 0xc0) {
 			inCollection = false;
 			isVendorSpecific = false;
@@ -208,6 +209,7 @@ void HIDDevice::ParseReportDescriptor()
 			}
 
 			if (isReport) {
+				
 				if (m_rptDesc.value[i] == 0x75) {
 					if (i + 1 >= m_rptDesc.size)
 						return;
@@ -221,7 +223,7 @@ void HIDDevice::ParseReportDescriptor()
 					reportCount = m_rptDesc.value[++i];
 					continue;
 				}
-
+				
 				if (m_rptDesc.value[i] == RMI_SET_LID_MODE_REPORT_ID) {
 					hasVendorDefineLIDMode = true;
 				}
@@ -286,6 +288,7 @@ void HIDDevice::ParseReportDescriptor()
 			}
 		}
 	}
+	fprintf(stdout, "\n");
 }
 
 int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)

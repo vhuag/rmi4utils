@@ -142,7 +142,7 @@ int HIDDevice::Open(const char * filename)
 				m_initialMode = HID_RMI4_MODE_ATTN_REPORTS;
 		}
 	}
-
+/*
 	if (m_initialMode != m_mode) {
 		rc = SetMode(m_mode);
 		if (rc) {
@@ -150,7 +150,7 @@ int HIDDevice::Open(const char * filename)
 			goto error;
 		}
 	}
-
+*/
 	return 0;
 
 error:

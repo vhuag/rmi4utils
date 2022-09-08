@@ -99,6 +99,7 @@ int HIDDevice::Open(const char * filename)
 		rc = -1;
 		goto error;
 	}
+	fprintf(stdout, "bus type is %d : ", m_info.bustype);
 
 	ParseReportDescriptor();
 
@@ -136,6 +137,7 @@ int HIDDevice::Open(const char * filename)
 	// hid-rmi indicated RMI Mode 1 all others would be Mode 0
 	if (LookupHidDeviceName(m_info.bustype, m_info.vendor, m_info.product, hidDeviceName)) {
 		if (LookupHidDriverName(hidDeviceName, hidDriverName)) {
+			fprintf(stdout, "hiddrivername %s : ", hidDriverName);
 			if (hidDriverName == "hid-rmi")
 				m_initialMode = HID_RMI4_MODE_ATTN_REPORTS;
 		}

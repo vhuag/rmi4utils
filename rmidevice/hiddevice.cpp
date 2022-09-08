@@ -93,12 +93,12 @@ int HIDDevice::Open(const char * filename)
 	rc = ioctl(m_fd, HIDIOCGRAWINFO, &m_info);
 	if (rc < 0)
 		goto error;
-	fprintf(stdout, "open4 dev %s \n", filename);
-	if (m_info.vendor != SYNAPTICS_VENDOR_ID) {
-		errno = -ENODEV;
-		rc = -1;
-		goto error;
-	}
+	fprintf(stdout, "open4 dev 0x%x \n", m_info.vendor);
+	//if (m_info.vendor != SYNAPTICS_VENDOR_ID) {
+	//	errno = -ENODEV;
+	//	rc = -1;
+	//	goto error;
+	//}
 	fprintf(stdout, "bus type is %d \n", m_info.bustype);
 
 	ParseReportDescriptor();

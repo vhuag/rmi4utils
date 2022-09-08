@@ -84,7 +84,7 @@ int HIDDevice::Open(const char * filename)
 	rc = ioctl(m_fd, HIDIOCGRDESCSIZE, &desc_size);
 	if (rc < 0)
 		goto error;
-	fprintf(stdout, "open2 dev %s \n", filename);
+	fprintf(stdout, "open2 dev %s desc size=%d \n", filename, desc_size);
 	m_rptDesc.size = desc_size;
 	rc = ioctl(m_fd, HIDIOCGRDESC, &m_rptDesc);
 	if (rc < 0)
@@ -94,11 +94,11 @@ int HIDDevice::Open(const char * filename)
 	if (rc < 0)
 		goto error;
 	fprintf(stdout, "open4 dev 0x%x \n", m_info.vendor);
-	//if (m_info.vendor != SYNAPTICS_VENDOR_ID) {
-	//	errno = -ENODEV;
-	//	rc = -1;
-	//	goto error;
-	//}
+	if (m_info.vendor != SYNAPTICS_VENDOR_ID) {
+		errno = -ENODEV;
+		rc = -1;
+		goto error;
+	}
 	fprintf(stdout, "bus type is %d \n", m_info.bustype);
 
 	ParseReportDescriptor();

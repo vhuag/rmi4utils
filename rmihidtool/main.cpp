@@ -306,7 +306,7 @@ int main(int argc, char ** argv)
 
 		}
 	}
-
+	printf("1\n");
 	if (!strncasecmp("hid", protocol, 3)) {
 		device = new HIDDevice();
 	} else {
@@ -318,7 +318,7 @@ int main(int argc, char ** argv)
 		print_help(argv[0]);
 		return -1;
 	}
-
+	printf("12\n");
 	if (deviceName) {
 		rc = device->Open(deviceName);
 		if (rc) {
@@ -330,7 +330,7 @@ int main(int argc, char ** argv)
 		if (!device->FindDevice(deviceType))
 			return -1;
 	}
-
+	printf("13\n");
 	g_device = device;
 
 	switch (cmd) {

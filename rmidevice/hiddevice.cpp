@@ -102,8 +102,9 @@ int HIDDevice::Open(const char * filename)
 	fprintf(stdout, "bus type is %d \n", m_info.bustype);
 
 	ParseReportDescriptor();
-	m_inputReportSize = 0x3d;
-	m_outputReportSize = 0x14;
+	//m_inputReportSize = 0x3d;
+	//m_outputReportSize = 0x14;
+	fprintf(stdout, "report size %d %d \n", m_inputReportSize, m_outputReportSize);
 	m_inputReport = new unsigned char[m_inputReportSize]();
 	if (!m_inputReport) {
 		errno = -ENOMEM;
@@ -143,15 +144,15 @@ int HIDDevice::Open(const char * filename)
 				m_initialMode = HID_RMI4_MODE_ATTN_REPORTS;
 		}
 	}
-/*
-	if (m_initialMode != m_mode) {
-		rc = SetMode(m_mode);
+
+	//if (m_initialMode != m_mode) {
+		rc = SetMode2(m_mode);
 		if (rc) {
 			rc = -1;
 			goto error;
 		}
-	}
-*/
+	//}
+
 	return 0;
 
 error:
@@ -177,7 +178,7 @@ void HIDDevice::ParseReportDescriptor()
 			isReport = false;
 			continue;
 		}
-
+		fprintf(stdout, "vendor %d isReport:%d report type 0x%x %d %d\n", isVendorSpecific, isReport, hidReportType, reportSize, reportCount);
 		if (isVendorSpecific) {
 			if (m_rptDesc.value[i] == 0x85) {
 				if (isReport) {
@@ -187,9 +188,11 @@ void HIDDevice::ParseReportDescriptor()
 					switch (hidReportType) {
 						case HID_REPORT_TYPE_INPUT:
 							m_inputReportSize = totalReportSize + 1;
+							fprintf(stdout, "m_inputReportSize=%d \n", m_inputReportSize);
 							break;
 						case HID_REPORT_TYPE_OUTPUT:
 							m_outputReportSize = totalReportSize + 1;
+							fprintf(stdout, "m_outputReportSize=%d \n", m_outputReportSize);
 							break;
 						case HID_REPORT_TYPE_FEATURE:
 							m_featureReportSize = totalReportSize + 1;
@@ -201,9 +204,9 @@ void HIDDevice::ParseReportDescriptor()
 				}
 
 				// reset values for the new report
-				totalReportSize = 0;
-				reportSize = 0;
-				reportCount = 0;
+				//totalReportSize = 0;
+				//reportSize = 0;
+				//reportCount = 0;
 				hidReportType = HID_REPORT_TYPE_UNKNOWN;
 
 				isReport = true;
@@ -215,6 +218,7 @@ void HIDDevice::ParseReportDescriptor()
 					if (i + 1 >= m_rptDesc.size)
 						return;
 					reportSize = m_rptDesc.value[++i];
+					fprintf(stdout, "report size=%d \n", reportSize);
 					continue;
 				}
 
@@ -222,6 +226,7 @@ void HIDDevice::ParseReportDescriptor()
 					if (i + 1 >= m_rptDesc.size)
 						return;
 					reportCount = m_rptDesc.value[++i];
+					fprintf(stdout, "reportCount %d \n", reportCount);
 					continue;
 				}
 				
@@ -462,6 +467,49 @@ int HIDDevice::SetMode(int mode)
 	return 0;
 }
 
+int HIDDevice::SetMode2(int mode)
+{
+	int rc;
+	char buf[120];
+	int rep_id = 0;
+	if (!m_deviceOpen)
+		return -1;
+
+	buf[0] = 0x11;
+	buf[1] = 0x88;
+	buf[2] = 0x33;
+	buf[3] = 0x12;
+	rc = ioctl(m_fd, HIDIOCSFEATURE(120), buf);
+	if (rc < 0) {
+		perror("HIDIOCSFEATURE");
+		return rc;
+	}
+	buf[0]=0x20;
+	buf[1]=0x73;
+	buf[2]=0x79;
+	buf[3]=0x6e;
+	buf[4]=0x61;
+	buf[5]=0x70;
+	buf[6]=0x74;
+	buf[7]=0x69;
+	buf[8]=0x00;
+	buf[9]=0x00;
+	//memcpy(&buf[1],"synaptics", strlen("synaptics"));
+	rc = write(m_fd, buf, 120);
+	if (rc<0)
+	{
+		perror("writefailed");
+	}
+	rc = GetReport(&rep_id);
+	if (rc<0)
+	{
+		perror("get failed");
+	}
+	return 0;
+}
+
+
+
 int HIDDevice::ToggleInterruptMask(bool enable)
 {
 	int rc;
@@ -614,7 +662,7 @@ int HIDDevice::GetReport(int *reportId, struct timeval * timeout)
 
 	if (reportId)
 		*reportId = m_inputReport[HID_RMI4_REPORT_ID];
-
+	fprintf(stdout, "!!!report id = 0x%x 0x%x\n", *reportId,m_inputReport[1]);
 	if (m_inputReport[HID_RMI4_REPORT_ID] == RMI_ATTN_REPORT_ID) {
 		if (static_cast<ssize_t>(m_inputReportSize) < count)
 			return -1;

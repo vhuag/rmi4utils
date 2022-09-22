@@ -51,6 +51,7 @@ public:
 	virtual int Write(unsigned short addr, const unsigned char *buf,
 				 unsigned short len);
 	virtual int SetMode(int mode);
+	virtual int SetMode2(int mode);
 	virtual int ToggleInterruptMask(bool enable);
 	virtual int WaitForAttention(struct timeval * timeout = NULL,
 					unsigned int source_mask = RMI_INTERUPT_SOURCES_ALL_MASK);

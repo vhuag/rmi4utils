@@ -60,8 +60,8 @@
 #define RMI_F34_ENABLE_WAIT_MS 300
 #define RMI_F34_ERASE_WAIT_MS (5 * 1000)
 #define RMI_F34_ERASE_V8_WAIT_MS (10000)
-#define RMI_F34_IDLE_WAIT_MS 500
-#define RMI_F34_PARTITION_READ_WAIT_MS 20
+#define RMI_F34_IDLE_WAIT_MS 3000
+#define RMI_F34_PARTITION_READ_WAIT_MS 200
 
 /* Most recent device status event */
 #define RMI_F01_STATUS_CODE(status)		((status) & 0x0f)
@@ -849,7 +849,8 @@ int RMI4Update::WriteFirmwareV7()
 
 		if(m_device.GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD)  {
 			// Sleep 100 ms and wait for attention for touchpad only.
-			Sleep(100);
+			// Need more than 5000 ms in BT case.
+			Sleep(10000);
 			rc = WaitForIdle(RMI_F34_IDLE_WAIT_MS, false);
 			if (rc != UPDATE_SUCCESS) {
 				fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));

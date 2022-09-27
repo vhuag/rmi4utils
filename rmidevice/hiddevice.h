@@ -103,6 +103,8 @@ private:
 	static bool LookupHidDriverName(std::string &deviceName, std::string &driverName);
 	static bool FindTransportDevice(uint32_t bus, std::string & hidDeviceName,
 					std::string & transportDeviceName, std::string & driverPath);
+
+	const char* BusToString(__u32 busType);
  };
 
 #endif /* _HIDDEVICE_H_ */

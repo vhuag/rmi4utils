@@ -286,6 +286,9 @@ void HIDDevice::ParseReportDescriptor()
 	}
 }
 
+#define HID_READ_TIMEOUT_MS 10
+#define HID_READ_TIMEOUT_MS_BT 1000
+
 int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
 {
 	ssize_t count;
@@ -300,9 +303,17 @@ int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
 	struct timeval tv;
 	int resendCount = 0;
 
-	tv.tv_sec = 10 / 1000;
-	tv.tv_usec = (10 % 1000) * 1000;
-	
+	if (m_info.bustype == BUS_BLUETOOTH)
+	{
+		tv.tv_sec = HID_READ_TIMEOUT_MS_BT / 1000;
+		tv.tv_usec = (HID_READ_TIMEOUT_MS_BT % 1000) * 1000;
+	}
+	else
+	{
+		tv.tv_sec = HID_READ_TIMEOUT_MS / 1000;
+		tv.tv_usec = (HID_READ_TIMEOUT_MS % 1000) * 1000;
+	}
+
 	if (!m_deviceOpen)
 		return -1;
 
@@ -433,6 +444,7 @@ int HIDDevice::Write(unsigned short addr, const unsigned char *buf, unsigned sho
 			else
 				return count;
 		}
+		Sleep(5);
 		return len;
 	}
 }
@@ -677,13 +689,34 @@ void HIDDevice::PrintReport(const unsigned char *report)
 	fprintf(stdout, "\n\n");
 }
 
+const char* HIDDevice::BusToString(__u32 busType)
+{
+	const char* str = NULL;
+	switch(busType)
+	{
+		case BUS_I2C:
+			str = "I2C";
+			break;
+		case BUS_BLUETOOTH:
+			str = "BLUETOOTH";
+			break;
+		case BUS_USB:
+			str = "USB";
+			break;
+		default:
+			str = "UNKNOWN";
+			break;
+	}
+	return str;
+}
+
 // Print protocol specific device information
 void HIDDevice::PrintDeviceInfo()
 {
 	enum RMIDeviceType deviceType = GetDeviceType();
 
 	fprintf(stdout, "HID device info:\nBus: %s Vendor: 0x%04x Product: 0x%04x\n",
-		m_info.bustype == BUS_I2C ? "I2C" : "USB", m_info.vendor, m_info.product);
+		BusToString(m_info.bustype), m_info.vendor, m_info.product);
 	fprintf(stdout, "Report sizes: input: %ld output: %ld\n", (unsigned long)m_inputReportSize,
 		(unsigned long)m_outputReportSize);
 	if (deviceType)

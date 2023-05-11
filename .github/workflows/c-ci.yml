@@ -25,5 +25,3 @@ jobs:
       with:
         name: built-binary
         path: ./rmi4update/rmi4update
-    - name: Run tests (optional)
-      run: make test

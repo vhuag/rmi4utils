@@ -1,0 +1,29 @@
+name: C CI
+
+on:
+  push:
+    branches: [ ci_build_20230511 ]
+  pull_request:
+    branches: [ ci_build_20230511 ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: sudo apt-get install -y build-essential
+
+    - name: Build
+      run: make
+
+    - name: Upload built binary
+      uses: actions/upload-artifact@v2
+      with:
+        name: built-binary
+        path: ./rmi4update/rmi4update
+    - name: Run tests (optional)
+      run: make test

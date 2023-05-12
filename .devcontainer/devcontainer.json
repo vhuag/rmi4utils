@@ -1,0 +1,18 @@
+{
+    "customizations": {
+        "repositories":{
+            "vhuag/toolfusion":{
+                "permissions":{
+                    "contents": "write",
+                    "pull_requests": "write"
+                }
+            },
+            "vhuag/rmi4utils":{
+                "permissions":{
+                    "contents": "write",
+                    "pull_requests": "write"
+                }
+            }
+        }
+    }
+}

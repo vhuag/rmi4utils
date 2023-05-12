@@ -4,13 +4,13 @@
             "vhuag/toolfusion":{
                 "permissions":{
                     "contents": "write",
-                    "pull_requests": "write"
+                    "pull_requests": "write-all"
                 }
             },
             "vhuag/rmi4utils":{
                 "permissions":{
                     "contents": "write",
-                    "pull_requests": "write"
+                    "pull_requests": "write-all"
                 }
             }
         }

@@ -47,3 +47,13 @@ jobs:
         asset_path: /home/runner/work/rmi4utils/rmi4utils/rmi4update/rmi4update
         asset_name: rmi4update
         asset_content_type: application/octet-stream
+
+    - name: Upload Release Asset2
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.RMI4UTILS_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: /home/runner/work/rmi4utils/rmi4utils/rmihidtool/rmihidtool
+        asset_name: rmihidtool
+        asset_content_type: application/octet-stream

@@ -26,8 +26,6 @@ jobs:
       run: |
         echo "RELEASE_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
         echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
-    - name: Print GITHUB_REF
-      run: echo $GITHUB_REF
   
     - name: Create Release
       id: create_release
@@ -46,7 +44,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: /home/runner/work/rmi4utils/rmi4utils/rmi4update/rmi4update
-        asset_name: rmi4update_x86_64
+        asset_name: rmi4update_x86-64
         asset_content_type: application/octet-stream
 
     - name: Upload Release Asset2
@@ -56,7 +54,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: /home/runner/work/rmi4utils/rmi4utils/rmihidtool/rmihidtool
-        asset_name: rmihidtool_x86_64
+        asset_name: rmihidtool_x86-64
         asset_content_type: application/octet-stream
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}

@@ -59,6 +59,8 @@ jobs:
 
   build_arm:
           runs-on: ubuntu-latest
+
+          needs: build
       
           steps:
           - name: Checkout repository

@@ -67,7 +67,7 @@ jobs:
             uses: actions/checkout@v2
       
           - name: Install dependencies
-            run: sudo apt-get install -y build-essential g++-arm-linux-gnueabi
+            run: sudo apt-get update & sudo apt-get install -y build-essential g++-arm-linux-gnueabi
       
           - name: Build
             env:

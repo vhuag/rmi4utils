@@ -39,11 +39,6 @@ jobs:
         release_name: ${{ env.RELEASE_NAME }}
         draft: false
         prerelease: false
-
-    - name: Set output
-      id: set_output
-      run: echo "upload_url=${{ steps.create_release.outputs.upload_url }}" >> $GITHUB_ENV
-
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
@@ -63,6 +58,8 @@ jobs:
         asset_path: /home/runner/work/rmi4utils/rmi4utils/rmihidtool/rmihidtool
         asset_name: rmihidtool_x86_64
         asset_content_type: application/octet-stream
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
 
   build_arm:
     runs-on: ubuntu-latest
@@ -87,7 +84,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.RMI4UTILS_TOKEN }}
       with:
-        upload_url: ${{ needs.build.outputs.set_output.outputs.upload_url }}
+        upload_url: ${{ needs.build.outputs.upload_url }}
         asset_path: /home/runner/work/rmi4utils/rmi4utils/rmi4update/rmi4update
         asset_name: rmi4update_arm
         asset_content_type: application/octet-stream
@@ -97,7 +94,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.RMI4UTILS_TOKEN }}
       with:
-        upload_url: ${{ needs.build.outputs.set_output.outputs.upload_url }}
+        upload_url: ${{ needs.build.outputs.upload_url }}
         asset_path: /home/runner/work/rmi4utils/rmi4utils/rmihidtool/rmihidtool
         asset_name: rmihidtool_arm
         asset_content_type: application/octet-stream

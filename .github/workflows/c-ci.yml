@@ -80,7 +80,7 @@ jobs:
             env:
               GITHUB_TOKEN: ${{ secrets.RMI4UTILS_TOKEN }}
             with:
-              upload_url: ${{ needs.build.outputs.create_release_upload_url }}
+              upload_url: ${{ needs.build.outputs.create_release.outputs.upload_url }}
               asset_path: /home/runner/work/rmi4utils/rmi4utils/rmi4update/rmi4update
               asset_name: rmi4update_arm
               asset_content_type: application/octet-stream
@@ -90,7 +90,7 @@ jobs:
             env:
               GITHUB_TOKEN: ${{ secrets.RMI4UTILS_TOKEN }}
             with:
-              upload_url: ${{ needs.build.outputs.create_release_upload_url }}
+              upload_url: ${{ needs.build.outputs.create_release.outputs.upload_url }}
               asset_path: /home/runner/work/rmi4utils/rmi4utils/rmihidtool/rmihidtool
               asset_name: rmihidtool_arm
               asset_content_type: application/octet-stream

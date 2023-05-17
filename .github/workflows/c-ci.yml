@@ -24,7 +24,7 @@ jobs:
         RELEASE_TAG: ${{ env.RELEASE_TAG }}
         RELEASE_NAME: ${{ env.RELEASE_NAME }}
       run: |
-        echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
+        echo "RELEASE_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
         echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
     - name: Print GITHUB_REF
       run: echo $GITHUB_REF
@@ -35,7 +35,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.RMI4UTILS_TOKEN }}
       with:
-        tag_name: ${{ env.GITHUB_REF.replace('refs/tags/', '') }}
+        tag_name: ${{ env.RELEASE_TAG }}
         release_name: ${{ env.RELEASE_NAME }}
         draft: false
         prerelease: false

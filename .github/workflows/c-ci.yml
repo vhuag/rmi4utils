@@ -139,7 +139,7 @@ jobs:
           -s dir \
           -t deb \
           -n rmi4utils \
-          -a arm \
+          -a arm64 \
           -m "Vincent Huang" \
           --vendor "Synaptics" \
           --url "https://github.com/vhuag/rmi4utils" \

@@ -111,14 +111,13 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 		m_device.ToggleInterruptMask(true);
 		return UPDATE_FAIL_QUERY_BASIC_PROPERTIES; 
 	}
-	// Restore the interrupts
-	m_device.ToggleInterruptMask(true);
 
 	if (!force && m_firmwareImage.HasIO()) {
 		if (m_firmwareImage.GetFirmwareID() <= m_device.GetFirmwareID()) {
 			fprintf(stderr, "Firmware image (%ld) is not newer then the firmware on the device (%ld)\n",
 				m_firmwareImage.GetFirmwareID(), m_device.GetFirmwareID());
 			rc = UPDATE_FAIL_FIRMWARE_IMAGE_IS_OLDER;
+			m_device.ToggleInterruptMask(true);
 			return rc;
 		}
 	}
@@ -127,16 +126,21 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 	m_device.PrintProperties();
 	if (m_device.GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {
 		rc = m_firmwareImage.VerifyImageProductID(m_device.GetProductID());
-		if (rc != UPDATE_SUCCESS)
+		if (rc != UPDATE_SUCCESS) {
+			m_device.ToggleInterruptMask(true);
 			return rc;
+		}
 	} else {
 		fprintf(stdout, "not touchpad, skip checking product ID\n");
 	}
 	
 
 	rc = DisableNonessentialInterupts();
-	if (rc != UPDATE_SUCCESS)
+	if (rc != UPDATE_SUCCESS) {
+		m_device.ToggleInterruptMask(true);
 		return rc;
+	}
+	
 
 	rc = ReadF34Queries();
 	if (rc != UPDATE_SUCCESS)
@@ -145,8 +149,10 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 	if (m_bootloaderID[1] < 10) {
 		// Checking size alignment for the device prior to BL v10.
 		rc = m_firmwareImage.VerifyImageMatchesDevice(GetFirmwareSize(), GetConfigSize());
-		if (rc != UPDATE_SUCCESS)
+		if (rc != UPDATE_SUCCESS) {
+			m_device.ToggleInterruptMask(true);
 			return rc;
+		}
 	} 
 
 	if (m_f34.GetFunctionVersion() == 0x02) {

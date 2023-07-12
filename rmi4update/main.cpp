@@ -36,9 +36,10 @@
 #define VERSION_MINOR		3
 #define VERSION_SUBMINOR	13
 
-#define RMI4UPDATE_GETOPTS	"hfd:t:pclvm"
+#define RMI4UPDATE_GETOPTS	"hfd:t:pclvmi:"
 
 bool needDebugMessage; 
+char hidraw_node[64]={0};
 
 void printHelp(const char *prog_name)
 {
@@ -51,6 +52,7 @@ void printHelp(const char *prog_name)
 	fprintf(stdout, "\t-l, --lockdown\t\tPerform lockdown.\n");
 	fprintf(stdout, "\t-v, --version\t\tPrint version number.\n");
 	fprintf(stdout, "\t-t, --device-type\tFilter by device type [touchpad or touchscreen].\n");
+	fprintf(stdout, "\t-i, --pid\tPid of device being updated.\n");
 }
 
 void printVersion()
@@ -97,6 +99,45 @@ int GetFirmwareProps(const char * deviceFile, std::string &props, bool configid)
 	return rc;
 }
 
+void get_hidraw_node(const char *desired_vid, const char *desired_pid, char *hidraw_node) {
+    DIR *dir;
+    struct dirent *entry;
+    char path[300];
+    char uevent_content[256];
+    FILE *uevent_file;
+
+    if ((dir = opendir("/sys/class/hidraw")) == NULL) {
+        perror("Cannot open /sys/class/hidraw");
+        return;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type == DT_LNK) {
+            snprintf(path, sizeof(path), "/sys/class/hidraw/%s/device/uevent", entry->d_name);
+            uevent_file = fopen(path, "r");
+            if (uevent_file) {
+                while (fgets(uevent_content, sizeof(uevent_content), uevent_file)) {
+                    // Extract VID and PID from MODALIAS line
+                    char *modalias = strstr(uevent_content, "MODALIAS=hid:");
+                    if (modalias) {
+                        char *vid_start = strstr(modalias, "v");
+                        char *pid_start = strstr(modalias, "p");
+                        if (vid_start && pid_start && strncasecmp(vid_start + 5, desired_vid, 4) == 0 &&
+                            strncasecmp(pid_start + 5, desired_pid, 4) == 0) {
+                            snprintf(hidraw_node, 64, "/dev/%s", entry->d_name);
+                            break;
+                        }
+                    }
+                }
+                fclose(uevent_file);
+            }
+        }
+        if(hidraw_node[0] != '\0') break; // Exit loop if device found
+    }
+
+    closedir(dir);
+}
+
 int main(int argc, char **argv)
 {
 	int rc;
@@ -115,6 +156,7 @@ int main(int argc, char **argv)
 		{"lockdown", 0, NULL, 'l'},
 		{"version", 0, NULL, 'v'},
 		{"device-type", 1, NULL, 't'},
+		{"pid", 1, NULL, 'i'},
 		{0, 0, 0, 0},
 	};
 	bool printFirmwareProps = false;
@@ -156,6 +198,17 @@ int main(int argc, char **argv)
 				return 0;
 			case 'm':
 				needDebugMessage = true;
+				break;
+			case 'i':
+				get_hidraw_node("06CB", optarg, hidraw_node);
+				if(hidraw_node[0] != '\0') {
+					printf("Found device: %s\n", hidraw_node);
+					if(!deviceName)
+						deviceName = hidraw_node;
+				} else {
+					printf("No device found with given PID.\n");
+				}
+
 				break;
 			default:
 				break;

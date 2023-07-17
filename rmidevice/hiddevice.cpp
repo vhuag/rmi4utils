@@ -67,7 +67,7 @@ enum hid_report_type {
 #if defined(__arm__) || defined(__aarch64__)
 #define HID_RMI4_READ_TIMEOUT_MS	30
 #else
-#define HID_RMI4_READ_TIMEOUT_MS	10
+#define HID_RMI4_READ_TIMEOUT_MS	50
 #endif
 
 int HIDDevice::Open(const char * filename)

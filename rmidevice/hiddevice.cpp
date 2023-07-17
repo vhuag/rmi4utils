@@ -64,6 +64,12 @@ enum hid_report_type {
 
 #define SYNAPTICS_VENDOR_ID			0x06cb
 
+#if defined(__arm__) || defined(__aarch64__)
+#define HID_RMI4_READ_TIMEOUT_MS	30
+#else
+#define HID_RMI4_READ_TIMEOUT_MS	10
+#endif
+
 int HIDDevice::Open(const char * filename)
 {
 	int rc;
@@ -300,8 +306,8 @@ int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
 	struct timeval tv;
 	int resendCount = 0;
 
-	tv.tv_sec = 10 / 1000;
-	tv.tv_usec = (10 % 1000) * 1000;
+	tv.tv_sec = HID_RMI4_READ_TIMEOUT_MS / 1000;
+	tv.tv_usec = (HID_RMI4_READ_TIMEOUT_MS % 1000) * 1000;
 	
 	if (!m_deviceOpen)
 		return -1;

@@ -60,9 +60,14 @@
 #define RMI_F34_ENABLE_WAIT_MS 300
 #define RMI_F34_ERASE_WAIT_MS (5 * 1000)
 #define RMI_F34_ERASE_V8_WAIT_MS (10000)
+
+#if defined(__arm__) || defined(__aarch64__)
+#define RMI_F34_IDLE_WAIT_MS 1000
+#define RMI_F34_PARTITION_READ_WAIT_MS 200
+#else
 #define RMI_F34_IDLE_WAIT_MS 500
 #define RMI_F34_PARTITION_READ_WAIT_MS 20
-
+#endif
 /* Most recent device status event */
 #define RMI_F01_STATUS_CODE(status)		((status) & 0x0f)
 /* Indicates that flash programming is enabled (bootloader mode). */

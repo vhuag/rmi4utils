@@ -462,6 +462,26 @@ int HIDDevice::SetMode(int mode)
 	return 0;
 }
 
+int HIDDevice::SetMode(int mode)
+{
+	int rc;
+	char buf[2];
+	
+	if (!m_deviceOpen)
+		return -1;
+
+	buf[0] = RMI_SET_RMI_MODE_REPORT_ID;
+	buf[1] = mode;
+	rc = ioctl(m_fd, HIDIOCSFEATURE(2), buf);
+	if (rc < 0) {
+		perror("HIDIOCSFEATURE");
+		return rc;
+	}
+
+	return 0;
+}
+
+
 int HIDDevice::ToggleInterruptMask(bool enable)
 {
 	int rc;
@@ -491,6 +511,41 @@ int HIDDevice::ToggleInterruptMask(bool enable)
 	} else {
 		buf[1] = 8;
 	}
+	rc = ioctl(m_fd, HIDIOCSFEATURE(2), buf);
+	if (rc < 0) {
+		perror("HIDIOCSFEATURE");
+		return rc;
+	}
+	Sleep(10);
+	return 0;
+}
+
+int HIDDevice::HIDReset()
+{
+	int rc;
+	char buf[2];
+
+	if (GetDeviceType() != RMI_DEVICE_TYPE_TOUCHPAD) {
+		fprintf(stdout, "Not TP, skip HID reset\n");
+		return 0;
+	}
+
+	// We can have information to see whether it exists this feature report currentlt.
+	// However, it might have no action even we set this feature with specific value.
+	// Need FW team's help to query more information about the existence of functions.
+	if (!hasVendorDefineLIDMode) {
+		if (m_hasDebug) {
+			fprintf(stdout, "no LID mode feature, return\n");
+		}
+		return 0;
+	}
+	
+	if (!m_deviceOpen)
+		return -1;
+
+	buf[0] = RMI_SET_LID_MODE_REPORT_ID;
+	buf[1] = 2;
+
 	rc = ioctl(m_fd, HIDIOCSFEATURE(2), buf);
 	if (rc < 0) {
 		perror("HIDIOCSFEATURE");

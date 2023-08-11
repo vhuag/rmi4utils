@@ -243,7 +243,10 @@ int RMIDevice::Reset()
 		return -1;
 
 	fprintf(stdout, "Resetting...\n");
-	rc = Write(f01.GetCommandBase(), &deviceReset, 1);
+	rc = HIDReset();
+	//	if (rc < 0 || rc < 1)
+	//		return true;
+	//rc = Write(f01.GetCommandBase(), &deviceReset, 1);
 	if (rc < 0 || rc < 1)
 		return rc;
 

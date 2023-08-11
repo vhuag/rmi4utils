@@ -47,6 +47,7 @@ public:
 				 unsigned short len) = 0;
 	virtual int SetMode(int mode) { return -1; /* Unsupported */ }
 	virtual int ToggleInterruptMask(bool enable) = 0;
+	virtual int HIDReset() = 0;
 	virtual int WaitForAttention(struct timeval * timeout = NULL,
 			unsigned int source_mask = RMI_INTERUPT_SOURCES_ALL_MASK) = 0;
 	virtual int GetAttentionReport(struct timeval * timeout, unsigned int source_mask,

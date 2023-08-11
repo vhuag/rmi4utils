@@ -462,26 +462,6 @@ int HIDDevice::SetMode(int mode)
 	return 0;
 }
 
-int HIDDevice::SetMode(int mode)
-{
-	int rc;
-	char buf[2];
-	
-	if (!m_deviceOpen)
-		return -1;
-
-	buf[0] = RMI_SET_RMI_MODE_REPORT_ID;
-	buf[1] = mode;
-	rc = ioctl(m_fd, HIDIOCSFEATURE(2), buf);
-	if (rc < 0) {
-		perror("HIDIOCSFEATURE");
-		return rc;
-	}
-
-	return 0;
-}
-
-
 int HIDDevice::ToggleInterruptMask(bool enable)
 {
 	int rc;

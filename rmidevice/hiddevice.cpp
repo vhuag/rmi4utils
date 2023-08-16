@@ -591,7 +591,7 @@ int HIDDevice::GetReport(int *reportId, struct timeval * timeout)
 		gettimeofday(&end, NULL); // Get the current time after select
 		// Print the time difference
 		printf("Time waited in select: %ld us timeout %ld us rc=%d\n", ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec),
-		timeout->tv_sec, timeout->tv_usec, rc));
+		timeout->tv_usec, rc));
 		if (rc == 0) {
 			return -ETIMEDOUT;
 		} else if (rc < 0) {

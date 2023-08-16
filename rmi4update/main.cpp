@@ -36,7 +36,7 @@
 #define VERSION_MINOR		3
 #define VERSION_SUBMINOR	13
 
-#define RMI4UPDATE_GETOPTS	"hfd:t:pclvmi:"
+#define RMI4UPDATE_GETOPTS	"hfad:t:pclvmi:"
 
 bool needDebugMessage; 
 char hidraw_node[64]={0};
@@ -137,7 +137,7 @@ void get_hidraw_node(const char *desired_vid, const char *desired_pid, char *hid
 
     closedir(dir);
 }
-
+uint32_t testmode=0;
 int main(int argc, char **argv)
 {
 	int rc;
@@ -157,6 +157,7 @@ int main(int argc, char **argv)
 		{"version", 0, NULL, 'v'},
 		{"device-type", 1, NULL, 't'},
 		{"pid", 1, NULL, 'i'},
+		{"test1", 0, NULL, 'a'},
 		{0, 0, 0, 0},
 	};
 	bool printFirmwareProps = false;
@@ -210,10 +211,41 @@ int main(int argc, char **argv)
 				}
 
 				break;
+			case 'a':
+				printf("Test1\n");
+				testmode=1;
+				break;
 			default:
 				break;
 
 		}
+	}
+	if(testmode==1)
+	{
+		std::string props;
+		int loop=30;
+		
+		if (!deviceName) {
+			fprintf(stderr, "Specifiy which device to query\n");
+			return 1;
+		}
+		while(loop--)
+		{
+			printf("reset test %d\n",loop);
+			rc = GetFirmwareProps(deviceName, props, true);
+			if (rc) {
+				fprintf(stderr, "Failed to read properties from device: %s\n", update_err_to_string(rc));
+				return 1;
+			}
+			rc = device.Open(deviceName);
+			if (rc) {
+				fprintf(stderr, "%s: failed to initialize rmi device (%d): %s\n", argv[0], errno,
+					strerror(errno));
+				return 1;
+			}
+			device.Reset();
+		}
+		return 0;
 	}
 
 	if (printFirmwareProps) {

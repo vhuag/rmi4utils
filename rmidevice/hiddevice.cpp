@@ -364,7 +364,7 @@ Resend:
 		while (bytesReadPerRequest < bytesToRequest) {
 			if (GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {
 				// Add timeout 10 ms for select() called in GetReport().
-				printf("getreport timeout1 %ld usec \n", tv.tv_usec);
+				printf("getreport timeout1 %ld usec %ld \n", tv.tv_usec, &tv);
 				rc = GetReport(&reportId, &tv);
 			} else {
 				// Touch Screen
@@ -592,8 +592,8 @@ int HIDDevice::GetReport(int *reportId, struct timeval * timeout)
 		rc = select(m_fd + 1, &fds, NULL, NULL, timeout);
 		gettimeofday(&end, NULL); // Get the current time after select
 		// Print the time difference
-		printf("Time waited in select: %ld us timeout %ld us rc=%d\n", ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)),
-		timeout->tv_usec, rc);
+		printf("Time waited in select: %ld us timeout %ld us \n", ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)),
+		timeout->tv_usec, timeout);
 		if (rc == 0) {
 			return -ETIMEDOUT;
 		} else if (rc < 0) {

@@ -458,7 +458,7 @@ int HIDDevice::SetMode(int mode)
 		perror("HIDIOCSFEATURE");
 		return rc;
 	}
-	Sleep(100);
+	//Sleep(100);
 	return 0;
 }
 
@@ -575,6 +575,7 @@ int HIDDevice::GetReport(int *reportId, struct timeval * timeout)
 	ssize_t count = 0;
 	fd_set fds;
 	int rc;
+	struct timeval start, end; // Declare variables for timestamps
 
 	if (!m_deviceOpen)
 		return -1;
@@ -585,10 +586,11 @@ int HIDDevice::GetReport(int *reportId, struct timeval * timeout)
 	for (;;) {
 		FD_ZERO(&fds);
 		FD_SET(m_fd, &fds);
-		fprintf(stdout, "get report time: %ld\n", time(NULL));
+		gettimeofday(&start, NULL); // Get the current time before select
 		rc = select(m_fd + 1, &fds, NULL, NULL, timeout);
-
-		fprintf(stdout, "get report time: %ld\n", time(NULL));
+		gettimeofday(&end, NULL); // Get the current time after select
+		// Print the time difference
+		printf("Time waited in select: %ld microseconds\n", ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)));
 		if (rc == 0) {
 			return -ETIMEDOUT;
 		} else if (rc < 0) {

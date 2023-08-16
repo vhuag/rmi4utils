@@ -223,13 +223,14 @@ int main(int argc, char **argv)
 	if(testmode==1)
 	{
 		std::string props;
-		int loop=30;
+		int loop=1;
 		
 		if (!deviceName) {
 			fprintf(stderr, "Specifiy which device to query\n");
 			return 1;
 		}
-		while(loop--)
+		//loop forever
+		while(loop)
 		{
 			printf("reset test %d\n",loop);
 			rc = GetFirmwareProps(deviceName, props, true);

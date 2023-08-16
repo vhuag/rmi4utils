@@ -364,9 +364,11 @@ Resend:
 		while (bytesReadPerRequest < bytesToRequest) {
 			if (GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {
 				// Add timeout 10 ms for select() called in GetReport().
+				printf("getreport timeout1 %ld usec \n", tv.tv_usec);
 				rc = GetReport(&reportId, &tv);
 			} else {
 				// Touch Screen
+				printf("getreport notimeout \n");
 				rc = GetReport(&reportId);
 			}
 			if (rc > 0 && reportId == RMI_READ_DATA_REPORT_ID) {

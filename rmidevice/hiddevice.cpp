@@ -146,7 +146,7 @@ int HIDDevice::Open(const char * filename)
 				m_initialMode = HID_RMI4_MODE_ATTN_REPORTS;
 		}
 	}
-
+	printf("initial %d \n",m_initialMode);
 	if (m_initialMode != m_mode) {
 		rc = SetMode(m_mode);
 		if (rc) {
@@ -450,7 +450,7 @@ int HIDDevice::SetMode(int mode)
 	
 	if (!m_deviceOpen)
 		return -1;
-
+	printf("set mode to %d \n", mode);
 	buf[0] = RMI_SET_RMI_MODE_REPORT_ID;
 	buf[1] = mode;
 	rc = ioctl(m_fd, HIDIOCSFEATURE(2), buf);

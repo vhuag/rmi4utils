@@ -91,6 +91,11 @@ int RMIDevice::QueryBasicProperties()
 		rc = Read(queryAddr, basicQuery, RMI_DEVICE_F01_BASIC_QUERY_LEN);
 		if (rc < 0 || rc < RMI_DEVICE_F01_BASIC_QUERY_LEN) {
 			fprintf(stderr, "Failed to read the basic query: %s\n", strerror(errno));
+			if(rc<RMI_DEVICE_F01_BASIC_QUERY_LEN)
+			{
+				printf("rc=%d \n");
+				return -1;
+			}
 			return rc;
 		}
 		m_manufacturerID = basicQuery[0];

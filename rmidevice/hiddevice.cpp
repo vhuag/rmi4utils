@@ -458,7 +458,7 @@ int HIDDevice::SetMode(int mode)
 		perror("HIDIOCSFEATURE");
 		return rc;
 	}
-
+	Sleep(100);
 	return 0;
 }
 

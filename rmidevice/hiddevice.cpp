@@ -65,7 +65,7 @@ enum hid_report_type {
 #define SYNAPTICS_VENDOR_ID			0x06cb
 
 #if defined(__arm__) || defined(__aarch64__)
-#define HID_RMI4_READ_TIMEOUT_MS	100
+#define HID_RMI4_READ_TIMEOUT_MS	200
 #else
 #define HID_RMI4_READ_TIMEOUT_MS	10
 #endif
@@ -592,7 +592,7 @@ int HIDDevice::GetReport(int *reportId, struct timeval * timeout)
 		rc = select(m_fd + 1, &fds, NULL, NULL, timeout);
 		gettimeofday(&end, NULL); // Get the current time after select
 		// Print the time difference
-		printf("Time waited in select: %ld us timeout %ld us \n", ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)),
+		printf("Time waited in select: %ld us timeout %ld us %ld\n", ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)),
 		timeout->tv_usec, timeout);
 		if (rc == 0) {
 			return -ETIMEDOUT;

@@ -585,8 +585,10 @@ int HIDDevice::GetReport(int *reportId, struct timeval * timeout)
 	for (;;) {
 		FD_ZERO(&fds);
 		FD_SET(m_fd, &fds);
-
+		fprintf(stdout, "get report time: %ld\n", time(NULL));
 		rc = select(m_fd + 1, &fds, NULL, NULL, timeout);
+
+		fprintf(stdout, "get report time: %ld\n", time(NULL));
 		if (rc == 0) {
 			return -ETIMEDOUT;
 		} else if (rc < 0) {

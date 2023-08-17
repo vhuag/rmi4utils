@@ -97,7 +97,7 @@ int GetFirmwareProps(const char * deviceFile, std::string &props, bool configid)
 	}
 
 	props = ss.str();
-
+	rmidevice.Close();
 	return rc;
 }
 
@@ -246,6 +246,7 @@ int main(int argc, char **argv)
 					strerror(errno));
 				return 1;
 			}
+			device.Close();
 		//	device.Reset();
 		}
 		return 0;

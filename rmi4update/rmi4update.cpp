@@ -62,8 +62,8 @@
 #define RMI_F34_ERASE_V8_WAIT_MS (10000)
 
 #if defined(__arm__) || defined(__aarch64__)
-#define RMI_F34_IDLE_WAIT_MS 1000
-#define RMI_F34_PARTITION_READ_WAIT_MS 200
+#define RMI_F34_IDLE_WAIT_MS 500
+#define RMI_F34_PARTITION_READ_WAIT_MS 20
 #else
 #define RMI_F34_IDLE_WAIT_MS 500
 #define RMI_F34_PARTITION_READ_WAIT_MS 20

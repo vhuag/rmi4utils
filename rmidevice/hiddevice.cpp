@@ -65,7 +65,7 @@ enum hid_report_type {
 #define SYNAPTICS_VENDOR_ID			0x06cb
 
 #if defined(__arm__) || defined(__aarch64__)
-#define HID_RMI4_READ_TIMEOUT_MS	100000
+#define HID_RMI4_READ_TIMEOUT_MS	10
 #else
 #define HID_RMI4_READ_TIMEOUT_MS	10
 #endif

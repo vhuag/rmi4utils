@@ -359,7 +359,9 @@ Resend:
 			}
 			break;
 		}
-
+		#if defined(__arm__) || defined(__aarch64__)
+		sleep(50);
+		#endif
 		bytesReadPerRequest = 0;
 		while (bytesReadPerRequest < bytesToRequest) {
 			if (GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {

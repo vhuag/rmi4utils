@@ -359,7 +359,7 @@ Resend:
 			}
 			break;
 		}
-
+		Sleep(50);
 		bytesReadPerRequest = 0;
 		while (bytesReadPerRequest < bytesToRequest) {
 			if (GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {

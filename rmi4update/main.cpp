@@ -246,7 +246,7 @@ int main(int argc, char **argv)
 					strerror(errno));
 				return 1;
 			}
-			device.Reset();
+		//	device.Reset();
 		}
 		return 0;
 	}

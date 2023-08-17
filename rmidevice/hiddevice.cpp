@@ -504,6 +504,7 @@ int HIDDevice::ToggleInterruptMask(bool enable)
 
 void HIDDevice::Close()
 {
+	printf("hiddevic close\n");
 	RMIDevice::Close();
 
 	if (!m_deviceOpen)

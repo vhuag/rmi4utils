@@ -85,6 +85,8 @@ public:
 
 	bool m_hasDebug;
 
+	bool m_noRebind;
+
 protected:
 	std::vector<RMIFunction> m_functionList;
 	unsigned char m_manufacturerID;

@@ -850,6 +850,19 @@ void HIDDevice::RebindDriver()
 	bindFile = m_driverPath + "bind";
 	unbindFile = m_driverPath + "unbind";
 
+	if(m_hasDebug)
+	{
+		fprintf(stdout, "bindFile: %s\n", bindFile.c_str());
+		fprintf(stdout, "unbindFile: %s\n", unbindFile.c_str());
+	
+	}
+	if(m_noRebind)
+	{
+		fprintf(stdout, "Skip driver rebind.\n");
+		return;
+	}
+
+
 	Sleep(500);
 	if (!WriteDeviceNameToFile(unbindFile.c_str(), m_transportDeviceName.c_str())) {
 		fprintf(stderr, "Failed to unbind HID device %s: %s\n",

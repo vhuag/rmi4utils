@@ -157,11 +157,13 @@ int main(int argc, char **argv)
 		{"version", 0, NULL, 'v'},
 		{"device-type", 1, NULL, 't'},
 		{"pid", 1, NULL, 'i'},
+		{"no-rebind", 0, NULL, 'n'},
 		{0, 0, 0, 0},
 	};
 	bool printFirmwareProps = false;
 	bool printConfigid = false;
 	bool performLockdown = false;
+	bool no_rebind = false;
 	needDebugMessage = false;
 	HIDDevice device;
 	enum RMIDeviceType deviceType = RMI_DEVICE_TYPE_ANY;
@@ -209,6 +211,9 @@ int main(int argc, char **argv)
 					printf("No device found with given PID.\n");
 				}
 
+				break;
+			case 'n':
+				no_rebind = true;
 				break;
 			default:
 				break;
@@ -259,6 +264,10 @@ int main(int argc, char **argv)
 
 	if (needDebugMessage) {
 		device.m_hasDebug = true;
+	}
+
+	if (no_rebind) {
+		device.m_noRebind = true;
 	}
 
 	RMI4Update update(device, image);

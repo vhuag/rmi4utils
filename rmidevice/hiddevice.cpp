@@ -854,6 +854,7 @@ void HIDDevice::RebindDriver()
 	{
 		fprintf(stdout, "bindFile: %s\n", bindFile.c_str());
 		fprintf(stdout, "unbindFile: %s\n", unbindFile.c_str());
+		fprintf(stdout, "transportDeviceName: %s\n", m_transportDeviceName.c_str());
 	
 	}
 	if(m_noRebind)

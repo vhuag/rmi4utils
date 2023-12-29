@@ -271,6 +271,12 @@ int main(int argc, char **argv)
 		device.m_noRebind = true;
 	}
 
+	#if defined(__arm__) || defined(__aarch64__)
+	fprintf(stdout, "arm platform. \n");
+	#else
+	fprintf(stdout, "x86_64 platform. \n");
+	#endif
+
 	RMI4Update update(device, image);
 	rc = update.UpdateFirmware(force, performLockdown);
 

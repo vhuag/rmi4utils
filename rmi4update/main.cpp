@@ -36,7 +36,7 @@
 #define VERSION_MINOR		3
 #define VERSION_SUBMINOR	13
 
-#define RMI4UPDATE_GETOPTS	"hfd:t:pclvmi:"
+#define RMI4UPDATE_GETOPTS	"hfd:t:pclvmi:n"
 
 bool needDebugMessage; 
 char hidraw_node[64]={0};
@@ -53,6 +53,7 @@ void printHelp(const char *prog_name)
 	fprintf(stdout, "\t-v, --version\t\tPrint version number.\n");
 	fprintf(stdout, "\t-t, --device-type\tFilter by device type [touchpad or touchscreen].\n");
 	fprintf(stdout, "\t-i, --pid\tPid of device being updated.\n");
+	fprintf(stdout, "\t-n, --no-rebind\tIgnore driver rebind.\n");
 }
 
 void printVersion()

@@ -871,12 +871,13 @@ void HIDDevice::RebindDriver()
 		return;
 	}
 	Sleep(500);
+	/*
 	if (!WriteDeviceNameToFile(bindFile.c_str(), m_transportDeviceName.c_str())) {
 		fprintf(stderr, "Failed to bind HID device %s: %s\n",
 			m_transportDeviceName.c_str(), strerror(errno));
 		return;
 	}
-
+      */
 	if (WaitForHidRawDevice(notifyFd, hidrawFile)) {
 		rc = Open(hidrawFile.c_str());
 		if (rc)

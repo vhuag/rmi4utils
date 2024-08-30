@@ -191,7 +191,7 @@ int RMIDevice::QueryBasicProperties()
 		}
 	}
 
-	if (GetFunction(f34, 0x34)) {
+	if (GetDeviceType() != RMI_DEVICE_TYPE_TOUCHPAD && GetFunction(f34, 0x34)) {
 		controlAddr = f34.GetControlBase();
 		rc = Read(controlAddr, configid, CONFIG_ID_BYTES);
 		if (rc < 0 || rc < CONFIG_ID_BYTES) {

@@ -979,7 +979,7 @@ bool HIDDevice::LookupHidDriverName(std::string &deviceName, std::string &driver
 {
 	bool ret = false;
 	ssize_t sz;
-	char link[PATH_MAX];
+	char link[PATH_MAX] = {0};
 	std::string driverLink = "/sys/bus/hid/devices/" + deviceName + "/driver";
 
 	sz = readlink(driverLink.c_str(), link, PATH_MAX);

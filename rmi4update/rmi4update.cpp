@@ -275,6 +275,13 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 						goto reset;
 					}
 					fprintf(stdout, "Writing flash config done V8...\n");
+					fprintf(stdout, "Resetting after Writing flash config V8...\n");
+					m_device.Reset();
+					if (rc != UPDATE_SUCCESS) {
+						fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
+						goto reset;
+					}
+					fprintf(stdout, "Reset done after Writing flash config V8...\n");
 				}
 			}
 			if (m_firmwareImage.GetFirmwareData()) {

@@ -108,6 +108,24 @@ int HIDDevice::Open(const char * filename)
 
 	ParseReportDescriptor();
 
+	if (m_deviceType == RMI_DEVICE_TYPE_TOUCHPAD) 
+	{
+		if (!(hasVendorDefineWriteReportID &&
+			hasVendorDefineReadAddrReportID &&
+			hasVendorDefineReadDataReportID && 
+			hasVendorDefineAttentionReportID &&
+			hasVendorDefineRMIModeReportID))
+		{
+			fprintf(stdout,"Write ReportID(0x%x) %s\n", RMI_WRITE_REPORT_ID, (hasVendorDefineWriteReportID ? "existed" : "not existed"));
+			fprintf(stdout,"Read Addr ReportID(0x%x) %s\n", RMI_READ_ADDR_REPORT_ID, (hasVendorDefineReadAddrReportID ? "existed" : "not existed"));
+			fprintf(stdout,"Read Data ReportID(0x%x) %s\n", RMI_READ_DATA_REPORT_ID, (hasVendorDefineReadDataReportID ? "existed" : "not existed"));
+			fprintf(stdout,"Attention ReportID(0x%x) %s\n", RMI_ATTN_REPORT_ID, (hasVendorDefineAttentionReportID ? "existed" : "not existed"));
+			fprintf(stdout,"Set RMI Mode ReportID(0x%x) %s\n", RMI_SET_RMI_MODE_REPORT_ID, (hasVendorDefineRMIModeReportID ? "existed" : "not existed"));
+			rc = -1;
+			goto error;
+		}
+	}
+
 	m_inputReport = new unsigned char[m_inputReportSize]();
 	if (!m_inputReport) {
 		errno = -ENOMEM;
@@ -228,6 +246,31 @@ void HIDDevice::ParseReportDescriptor()
 
 				if (m_rptDesc.value[i] == RMI_SET_LID_MODE_REPORT_ID) {
 					hasVendorDefineLIDMode = true;
+				}
+
+				if (m_rptDesc.value[i] == RMI_WRITE_REPORT_ID)
+				{
+					hasVendorDefineWriteReportID = true;
+				}
+
+				if (m_rptDesc.value[i] == RMI_READ_ADDR_REPORT_ID)
+				{
+					hasVendorDefineReadAddrReportID = true;
+				}
+
+				if (m_rptDesc.value[i] == RMI_READ_DATA_REPORT_ID)
+				{
+					hasVendorDefineReadDataReportID = true;
+				}
+
+				if (m_rptDesc.value[i] == RMI_ATTN_REPORT_ID)
+				{
+					hasVendorDefineAttentionReportID = true;
+				}
+
+				if (m_rptDesc.value[i] == RMI_SET_RMI_MODE_REPORT_ID)
+				{
+					hasVendorDefineRMIModeReportID = true;
 				}
 
 				if (m_rptDesc.value[i] == HID_REPORT_TYPE_INPUT)

@@ -43,7 +43,12 @@ public:
 		      m_initialMode(HID_RMI4_MODE_MOUSE),
 		      m_transportDeviceName(""),
 		      m_driverPath(""),
-		      hasVendorDefineLIDMode(false)
+		      hasVendorDefineLIDMode(false),
+		      hasVendorDefineWriteReportID(false),
+		      hasVendorDefineReadAddrReportID(false),
+		      hasVendorDefineReadDataReportID(false),
+		      hasVendorDefineAttentionReportID(false),
+		      hasVendorDefineRMIModeReportID(false)
 	{}
 	virtual int Open(const char * filename);
 	virtual int Read(unsigned short addr, unsigned char *buf,
@@ -91,6 +96,11 @@ private:
 	std::string m_driverPath;
 
 	bool hasVendorDefineLIDMode;
+	bool hasVendorDefineWriteReportID;
+	bool hasVendorDefineReadAddrReportID;
+	bool hasVendorDefineReadDataReportID;
+	bool hasVendorDefineAttentionReportID;
+	bool hasVendorDefineRMIModeReportID;
 
 	int GetReport(int *reportId, struct timeval * timeout = NULL);
 	void PrintReport(const unsigned char *report);

@@ -43,7 +43,7 @@
 #define RMI_SET_LID_MODE_REPORT_ID          0xe // Feature Report
 
 
-enum hid_report_type {
+enum syna_hid_report_type {
 	HID_REPORT_TYPE_UNKNOWN			= 0x0,
 	HID_REPORT_TYPE_INPUT			= 0x81,
 	HID_REPORT_TYPE_OUTPUT			= 0x91,
@@ -187,7 +187,7 @@ void HIDDevice::ParseReportDescriptor()
 	int totalReportSize = 0;
 	int reportSize = 0;
 	int reportCount = 0;
-	enum hid_report_type hidReportType = HID_REPORT_TYPE_UNKNOWN;
+	enum syna_hid_report_type hidReportType = HID_REPORT_TYPE_UNKNOWN;
 	bool inCollection = false;
 
 	for (unsigned int i = 0; i < m_rptDesc.size; ++i) {

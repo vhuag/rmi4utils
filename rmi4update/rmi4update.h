@@ -68,11 +68,13 @@ enum v7_flash_command {
 };
 
 enum bl_version {
-	BL_V5 = 5,
-	BL_V6 = 6,
-	BL_V7 = 7,
-	BL_V8 = 8,
-	BL_V10 = 10,
+	BL_V7Before = 50,
+	BL_V7 = 70,
+	BL_V8 = 80,
+	BL_V8_5 = 85,
+	BL_V8_7 = 87,
+	BL_V10 = 100,
+	BL_V10_1 = 101,
 };
 
 struct f34_v7_query_0 {
@@ -195,8 +197,12 @@ private:
 	int GetFirmwareSize() { return m_blockSize * m_fwBlockCount; }
 	int GetConfigSize() { return m_blockSize * m_configBlockCount; }
 	int WriteSignatureV7(enum signature_BLv7 signature_partition, unsigned char* data, int offset);
-	bool IsBLv87();
 	int ReadMSL();
+	int GetDeviceBootloaderVersion();
+	int EnterSBLModeV10_1();
+	int ReadSBLMSL();
+	int EraseSBLV10_1();
+	int WriteSBLV10_1();
 
 private:
 	RMIDevice & m_device;
@@ -237,6 +243,9 @@ private:
 	bool m_hasCoreConfig;
 	bool m_hasFlashConfig;
 	bool m_hasGlobalParameters;
+	bool m_hasSBL;
+	
+	bool m_hasSecurity;
 	/* BL_V7 end */
 
 	/* BL v8.7 */
@@ -246,6 +255,11 @@ private:
 	/* for BL V10 */
 	bool m_hasFLD;
 	/* BL_V7 end */
+
+	/* for BL V10.1 */
+	bool m_hasSBLMSL;
+	unsigned short m_sblMSL;
+	/* BL V10.1 end*/
 
 	unsigned short m_f34StatusAddr;
 	enum bl_version m_blVersion;

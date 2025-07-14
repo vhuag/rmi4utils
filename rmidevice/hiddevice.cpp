@@ -43,11 +43,11 @@
 #define RMI_SET_LID_MODE_REPORT_ID          0xe // Feature Report
 
 
-enum hid_report_type {
-	HID_REPORT_TYPE_UNKNOWN			= 0x0,
-	HID_REPORT_TYPE_INPUT			= 0x81,
-	HID_REPORT_TYPE_OUTPUT			= 0x91,
-	HID_REPORT_TYPE_FEATURE			= 0xb1,
+enum syna_hid_report_type {
+	SYNA_HID_REPORT_TYPE_UNKNOWN			= 0x0,
+	SYNA_HID_REPORT_TYPE_INPUT			= 0x81,
+	SYNA_HID_REPORT_TYPE_OUTPUT			= 0x91,
+	SYNA_HID_REPORT_TYPE_FEATURE			= 0xb1,
 };
 
 #define HID_RMI4_REPORT_ID			0
@@ -187,7 +187,7 @@ void HIDDevice::ParseReportDescriptor()
 	int totalReportSize = 0;
 	int reportSize = 0;
 	int reportCount = 0;
-	enum hid_report_type hidReportType = HID_REPORT_TYPE_UNKNOWN;
+	enum syna_hid_report_type hidReportType = SYNA_HID_REPORT_TYPE_UNKNOWN;
 	bool inCollection = false;
 
 	for (unsigned int i = 0; i < m_rptDesc.size; ++i) {
@@ -205,16 +205,16 @@ void HIDDevice::ParseReportDescriptor()
 					totalReportSize = (reportSize * reportCount) >> 3;
 
 					switch (hidReportType) {
-						case HID_REPORT_TYPE_INPUT:
+						case SYNA_HID_REPORT_TYPE_INPUT:
 							m_inputReportSize = totalReportSize + 1;
 							break;
-						case HID_REPORT_TYPE_OUTPUT:
+						case SYNA_HID_REPORT_TYPE_OUTPUT:
 							m_outputReportSize = totalReportSize + 1;
 							break;
-						case HID_REPORT_TYPE_FEATURE:
+						case SYNA_HID_REPORT_TYPE_FEATURE:
 							m_featureReportSize = totalReportSize + 1;
 							break;
-						case HID_REPORT_TYPE_UNKNOWN:
+						case SYNA_HID_REPORT_TYPE_UNKNOWN:
 						default:
 							break;
 					}
@@ -224,7 +224,7 @@ void HIDDevice::ParseReportDescriptor()
 				totalReportSize = 0;
 				reportSize = 0;
 				reportCount = 0;
-				hidReportType = HID_REPORT_TYPE_UNKNOWN;
+				hidReportType = SYNA_HID_REPORT_TYPE_UNKNOWN;
 
 				isReport = true;
 			}
@@ -273,14 +273,14 @@ void HIDDevice::ParseReportDescriptor()
 					hasVendorDefineRMIModeReportID = true;
 				}
 
-				if (m_rptDesc.value[i] == HID_REPORT_TYPE_INPUT)
-					hidReportType = HID_REPORT_TYPE_INPUT;
+				if (m_rptDesc.value[i] == SYNA_HID_REPORT_TYPE_INPUT)
+					hidReportType = SYNA_HID_REPORT_TYPE_INPUT;
 
-				if (m_rptDesc.value[i] == HID_REPORT_TYPE_OUTPUT)
-					hidReportType = HID_REPORT_TYPE_OUTPUT;
+				if (m_rptDesc.value[i] == SYNA_HID_REPORT_TYPE_OUTPUT)
+					hidReportType = SYNA_HID_REPORT_TYPE_OUTPUT;
 
-				if (m_rptDesc.value[i] == HID_REPORT_TYPE_FEATURE) {
-					hidReportType = HID_REPORT_TYPE_FEATURE;
+				if (m_rptDesc.value[i] == SYNA_HID_REPORT_TYPE_FEATURE) {
+					hidReportType = SYNA_HID_REPORT_TYPE_FEATURE;
 				}
 			}
 		}

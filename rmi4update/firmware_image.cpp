@@ -54,7 +54,7 @@ void FirmwareImage::ParseHierarchicalImg()
 	unsigned int length;
 	unsigned char *content;
 	unsigned short container_id;
-	unsigned int sigature_size;
+	unsigned int signature_size;
 	
 	for (ii = 0; ii < BLv7_MAX; ii++) {
 		m_signatureInfo[ii].bExisted = false;
@@ -78,7 +78,7 @@ void FirmwareImage::ParseHierarchicalImg()
 				descriptor->container_id[1] << 8;
 		content = m_memBlock + extract_long(descriptor->content_address);
 		length = extract_long(descriptor->content_length);
-		sigature_size = extract_long(descriptor->signature_size);
+		signature_size = extract_long(descriptor->signature_size);
 		switch (container_id) {
 		case BL_CONTAINER:
 			m_bootloaderVersion = *content;
@@ -86,29 +86,29 @@ void FirmwareImage::ParseHierarchicalImg()
 			break;
 		case UI_CONTAINER:
 		case CORE_CODE_CONTAINER:
-			if (sigature_size != 0) {
-				fprintf(stdout, "CORE CODE signature size : 0x%x\n", sigature_size);
+			if (signature_size != 0) {
+				fprintf(stdout, "CORE CODE signature size : 0x%x\n", signature_size);
 				m_signatureInfo[BLv7_CORE_CODE].bExisted = true;
-				m_signatureInfo[BLv7_CORE_CODE].size = sigature_size;
+				m_signatureInfo[BLv7_CORE_CODE].size = signature_size;
 			}
 			m_firmwareData = content;
 			m_firmwareSize = length;
 			break;
 		case FLASH_CONFIG_CONTAINER:
-			if (sigature_size != 0) {
-				fprintf(stdout, "FLASH CONFIG signature size : 0x%x\n", sigature_size);
+			if (signature_size != 0) {
+				fprintf(stdout, "FLASH CONFIG signature size : 0x%x\n", signature_size);
 				m_signatureInfo[BLv7_FLASH_CONFIG].bExisted = true;
-				m_signatureInfo[BLv7_FLASH_CONFIG].size = sigature_size;
+				m_signatureInfo[BLv7_FLASH_CONFIG].size = signature_size;
 			}
 			m_flashConfigData = content;
 			m_flashConfigSize = length;
 			break;
 		case UI_CONFIG_CONTAINER:
 		case CORE_CONFIG_CONTAINER:
-			if (sigature_size != 0) {
-				fprintf(stdout, "CORE CONFIG signature size : 0x%x\n", sigature_size);
+			if (signature_size != 0) {
+				fprintf(stdout, "CORE CONFIG signature size : 0x%x\n", signature_size);
 				m_signatureInfo[BLv7_CORE_CONFIG].bExisted = true;
-				m_signatureInfo[BLv7_CORE_CONFIG].size = sigature_size;
+				m_signatureInfo[BLv7_CORE_CONFIG].size = signature_size;
 			}
 			m_configData = content;
 			m_configSize = length;
@@ -133,10 +133,10 @@ void FirmwareImage::ParseHierarchicalImg()
 			}
 			break;
 		case FIXED_LOCATION_DATA_CONTAINER:
-			if (sigature_size != 0) {
-				fprintf(stdout, "FLD signature size : 0x%x\n", sigature_size);
+			if (signature_size != 0) {
+				fprintf(stdout, "FLD signature size : 0x%x\n", signature_size);
 				m_signatureInfo[BLv7_FLD].bExisted = true;
-				m_signatureInfo[BLv7_FLD].size = sigature_size;
+				m_signatureInfo[BLv7_FLD].size = signature_size;
 			}
 			m_fldData = content;
 			m_fldSize = length;

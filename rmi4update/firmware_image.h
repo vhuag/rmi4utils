@@ -97,6 +97,7 @@ enum signature_BLv7 {
 	BLv7_CORE_CONFIG,
 	BLv7_FLASH_CONFIG,
 	BLv7_FLD,
+	BLv7_SBL,
 	BLv7_MAX
 };
 
@@ -133,14 +134,18 @@ public:
 	signature_info *GetSignatureInfo() { return m_signatureInfo; }
 	int VerifyImageProductID(char* deviceProductID);
 	bool IsImageHasFirmwareVersion() { return m_hasFirmwareVersion; }
-
+	
 	bool HasIO() { return m_io; }
+	bool HasSBL();
+	unsigned char * GetSBLData() { return m_SBLData; }
+	unsigned long GetSBLSize() { return m_SBLSize; }
 	~FirmwareImage();
 
 private:
 	unsigned long Checksum(unsigned short * data, unsigned long len);
 	void PrintHeaderInfo();
 	void ParseHierarchicalImg();	// BL_V7
+	void ParsingSBLContainer(unsigned int startOffset);     // BL_V10_1+
 
 private:
 	unsigned long m_checksum;
@@ -169,6 +174,8 @@ private:
 	unsigned long m_globalparaSize;
 	unsigned short m_firmwareVersion;
 	bool m_hasFirmwareVersion;
+	unsigned char * m_SBLData;
+	unsigned long m_SBLSize;
 
 	signature_info m_signatureInfo[BLv7_MAX];
 };

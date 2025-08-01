@@ -162,7 +162,7 @@ void FirmwareImage::ParsingSBLContainer(unsigned int startOffset)
 	unsigned int length;
 	unsigned char *content;
 	unsigned short container_id;
-	unsigned int sigature_size;
+	unsigned int signature_size;
 
 	cntrAddr = extract_long(&m_memBlock[startOffset]);
 	descriptor = (struct container_descriptor *)(m_memBlock + cntrAddr);
@@ -177,14 +177,14 @@ void FirmwareImage::ParsingSBLContainer(unsigned int startOffset)
 				descriptor->container_id[1] << 8;
 		content = m_memBlock + extract_long(descriptor->content_address);
 		length = extract_long(descriptor->content_length);
-		sigature_size = extract_long(descriptor->signature_size);
-		
+		signature_size = extract_long(descriptor->signature_size);
+
 		switch (container_id) {
 		case BL_IMAGE_CONTAINER:
-			if (sigature_size != 0) {
-				fprintf(stdout, "SBL signature size : 0x%x\n", sigature_size);
+			if (signature_size != 0) {
+				fprintf(stdout, "SBL signature size : 0x%x\n", signature_size);
 				m_signatureInfo[BLv7_SBL].bExisted = true;
-				m_signatureInfo[BLv7_SBL].size = sigature_size;
+				m_signatureInfo[BLv7_SBL].size = signature_size;
 			}
 			m_SBLData = content;
 			m_SBLSize = length;

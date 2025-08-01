@@ -2367,7 +2367,6 @@ int RMI4Update::EraseSBLV10_1()
 int RMI4Update::EnterSBLModeV10_1()
 {
 	int rc;
-	unsigned char f34_status;
 	if(GetDeviceBootloaderVersion() >= BL_V10_1) {
 		fprintf(stdout, "Going to SBL mode...\n");
 		unsigned char EnterCmd[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};

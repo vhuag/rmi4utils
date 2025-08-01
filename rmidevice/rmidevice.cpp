@@ -317,6 +317,7 @@ Retry:		rc = Read(addr, entry, RMI_DEVICE_PDT_ENTRY_SIZE);
 					return rc;
 				}
 			}
+			retryCount = 0;
 			
 			RMIFunction func(entry, page_start, interruptCount);
 			if (func.GetFunctionNumber() == 0)

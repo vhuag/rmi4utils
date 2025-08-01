@@ -124,7 +124,7 @@ void get_hidraw_node(const char *desired_vid, const char *desired_pid, char *hid
                         char *pid_start = strstr(modalias, "p");
                         if (vid_start && pid_start && strncasecmp(vid_start + 5, desired_vid, 4) == 0 &&
                             strncasecmp(pid_start + 5, desired_pid, 4) == 0) {
-                            snprintf(hidraw_node, 64, "/dev/%s", entry->d_name);
+                            snprintf(hidraw_node, 64, "/dev/%.58s", entry->d_name);
                             break;
                         }
                     }

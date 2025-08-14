@@ -290,6 +290,8 @@ int RMIDevice::ScanPDT(int endFunc, int endPage)
 	unsigned char entry[RMI_DEVICE_PDT_ENTRY_SIZE];
 	unsigned int interruptCount = 0;
 
+	unsigned int retryCount = 0;
+
 	maxPage = (unsigned int)((endPage < 0) ? RMI_DEVICE_MAX_PAGE : endPage);
 
 	m_functionList.clear();
@@ -303,11 +305,19 @@ int RMIDevice::ScanPDT(int endFunc, int endPage)
 		SetRMIPage(page);
 
 		for (addr = pdt_start; addr >= pdt_end; addr -= RMI_DEVICE_PDT_ENTRY_SIZE) {
-			rc = Read(addr, entry, RMI_DEVICE_PDT_ENTRY_SIZE);
+Retry:		rc = Read(addr, entry, RMI_DEVICE_PDT_ENTRY_SIZE);
 			if (rc < 0 || rc < RMI_DEVICE_PDT_ENTRY_SIZE) {
-				fprintf(stderr, "Failed to read PDT entry at address (0x%04x)\n", addr);
-				return rc;
+				if (retryCount < 3) {
+					fprintf(stdout, "Retrying to read PDT entry at address (0x%04x)\n", addr);
+					retryCount++;
+					Sleep(10);
+					goto Retry;
+				} else {
+					fprintf(stderr, "Failed to read PDT entry at address (0x%04x)\n", addr);
+					return rc;
+				}
 			}
+			retryCount = 0;
 			
 			RMIFunction func(entry, page_start, interruptCount);
 			if (func.GetFunctionNumber() == 0)

@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: bash pack.sh [updater] [image] [output] [default_iface]
+UPDATER="${1:-rmi4update}"
+IMAGE="${2:-xxx.img}"
+DEFAULT_IFACE="${3:-ce57}"
+OUT="${4:-rmi4update_onefile.sh}"
+
+
+for f in "$UPDATER" "$IMAGE"; do
+  [[ -f "$f" ]] || { echo "Error: $f not found" >&2; exit 1; }
+done
+command -v base64 >/dev/null || { echo "Error: base64 not found" >&2; exit 1; }
+
+sha_upd=$(sha256sum "$UPDATER" | awk '{print $1}')
+sha_img=$(sha256sum "$IMAGE"   | awk '{print $1}')
+
+# ----- header (part 1) -----
+cat > "$OUT" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+need() { command -v "$1" >/dev/null || { echo "Error: need $1" >&2; exit 1; }; }
+need base64; need sha256sum; need mktemp
+TMPDIR="$(mktemp -d /dev/shm/rmi4.XXXX)"; trap 'rm -rf "$TMPDIR"' EXIT INT TERM
+UPD="$TMPDIR/rmi4update"; IMG="$TMPDIR/xxx.img"
+SH
+
+# inject build-time default iface
+cat >> "$OUT" <<SH
+DEFAULT_IFACE="${DEFAULT_IFACE}"
+SH
+
+# ----- header (part 2): arg parsing & decode updater -----
+cat >> "$OUT" <<'SH'
+
+# ---- parse optional arguments ----
+#   --iface NAME  or  -i NAME   : override default interface
+#   --help / -h                  : usage
+CUSTOM_IFACE=""
+POSITIONAL=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --iface|-i)
+      [[ $# -ge 2 ]] || { echo "Error: --iface requires a value" >&2; exit 1; }
+      CUSTOM_IFACE="$2"; shift 2;;
+    --help|-h)
+      echo "Usage: $0 [--iface NAME] [--] [extra args passed to updater]"
+      exit 0;;
+    --) shift; break;;
+    *) POSITIONAL+=("$1"); shift;;
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
+# resolve final iface
+IFACE="${CUSTOM_IFACE:-$DEFAULT_IFACE}"
+
+# ---- decode embedded updater ----
+base64 -d >"$UPD" <<'B64_UPDATER'
+SH
+
+# embed updater
+base64 -w0 "$UPDATER" >> "$OUT"; echo >> "$OUT"
+
+# continue script
+cat >> "$OUT" <<'SH'
+B64_UPDATER
+chmod +x "$UPD"
+
+# ---- decode embedded image ----
+base64 -d >"$IMG" <<'B64_IMAGE'
+SH
+
+# embed image
+base64 -w0 "$IMAGE" >> "$OUT"; echo >> "$OUT"
+
+# ----- footer -----
+cat >> "$OUT" <<SH
+B64_IMAGE
+
+# verify embedded payloads (only if using embedded ones)
+exp_upd_sha="$sha_upd"; exp_img_sha="$sha_img"
+act_upd_sha=\$(sha256sum "\$UPD" | awk '{print \$1}')
+act_img_sha=\$(sha256sum "\$IMG" | awk '{print \$1}')
+[[ "\$act_upd_sha" == "\$exp_upd_sha" ]] || { echo "updater checksum mismatch" >&2; exit 1; }
+[[ "\$act_img_sha" == "\$exp_img_sha" ]] || { echo "image checksum mismatch" >&2; exit 1; }
+
+# run with sudo and the chosen interface
+if [[ \$EUID -ne 0 ]]; then
+  sudo "\$UPD" -i "\$IFACE" "\$IMG" "\$@"
+else
+  "\$UPD" -i "\$IFACE" "\$IMG" "\$@"
+fi
+SH
+
+chmod +x "$OUT"
+echo "✅ Generated $OUT"
+echo "   - updater sha256: $sha_upd"
+echo "   - image   sha256: $sha_img"
+echo "   - default iface : $DEFAULT_IFACE"

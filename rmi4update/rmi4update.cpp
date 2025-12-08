@@ -672,9 +672,13 @@ int RMI4Update::ReadFlashConfig()
 	fprintf(stdout, "F34 guest blocks:     %d\n", m_guestBlockCount);
 	fprintf(stdout, "\n");
 
-	m_guestData = (unsigned char *) malloc(m_guestBlockCount * m_blockSize);
-	memset(m_guestData, 0, m_guestBlockCount * m_blockSize);
-	memset(m_guestData + m_guestBlockCount * m_blockSize -4, 0, 4);
+	if(m_partitionGuest != NULL && (m_guestBlockCount * m_blockSize) >= 4) {
+		m_guestData = (unsigned char *) malloc(m_guestBlockCount * m_blockSize);
+		if (m_guestData != NULL) {
+			memset(m_guestData, 0, m_guestBlockCount * m_blockSize);
+			memset(m_guestData + m_guestBlockCount * m_blockSize -4, 0, 4);
+		}
+	}
 	return UPDATE_SUCCESS;
 }
 

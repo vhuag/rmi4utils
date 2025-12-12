@@ -575,11 +575,17 @@ int RMI4Update::ReadFlashConfig()
 
 	/* set partition id for bootloader 7 */
 	rc = m_device.Write(dataAddr + 1, &partition_id, sizeof(partition_id));
-	if (rc != sizeof(partition_id))
+	if (rc != sizeof(partition_id)) {
+		free(flash_cfg);
+		free(partition_temp);
 		return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+	}
 	rc = m_device.Write(dataAddr + 2, off, sizeof(off));
-	if (rc != sizeof(off))
+	if (rc != sizeof(off)) {
+		free(flash_cfg);
+		free(partition_temp);
 		return UPDATE_FAIL_WRITE_INITIAL_ZEROS;
+	}
 
 	for (i = 0; i < transaction_count; i++)
 	{
@@ -592,14 +598,20 @@ int RMI4Update::ReadFlashConfig()
 		trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
 		trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
 		rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
-		if (rc != sizeof(trans_leng_buf))
+		if (rc != sizeof(trans_leng_buf)) {
+			free(flash_cfg);
+			free(partition_temp);
 			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		}
 
 		// Set Command to Read
 		cmd_buf[0] = (unsigned char)CMD_V7_READ;
 		rc = m_device.Write(dataAddr + 4, cmd_buf, sizeof(cmd_buf));
-		if (rc != sizeof(cmd_buf))
+		if (rc != sizeof(cmd_buf)) {
+			free(flash_cfg);
+			free(partition_temp);
 			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		}
 
 		if(m_device.GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD)  {
 			// Sleep 20 ms and wait for attention for touchpad only.
@@ -607,6 +619,8 @@ int RMI4Update::ReadFlashConfig()
 			rc = WaitForIdle(RMI_F34_PARTITION_READ_WAIT_MS, false);
 			if (rc != UPDATE_SUCCESS) {
 				fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
+				free(flash_cfg);
+				free(partition_temp);
 				return UPDATE_FAIL_TIMEOUT_WAITING_FOR_ATTN;
 			}
 			fprintf(stdout, "Got attention\n");
@@ -655,6 +669,12 @@ int RMI4Update::ReadFlashConfig()
 		if (partition_temp->partition_id == CORE_CONFIG_PARTITION)
 		{
 			m_partitionConfig = (partition_tbl *) malloc(sizeof(struct partition_tbl));
+			if (!m_partitionConfig) {
+				fprintf(stderr, "%s: Failed to allocate memory for m_partitionConfig\n", __func__);
+				free(flash_cfg);
+				free(partition_temp);
+				return UPDATE_FAIL;
+			}
 			memcpy(m_partitionConfig ,partition_temp, sizeof(struct partition_tbl));
 			memset(partition_temp, 0, sizeof(struct partition_tbl));
 			fprintf(stdout, "CORE_CONFIG_PARTITION is found\n");
@@ -662,6 +682,13 @@ int RMI4Update::ReadFlashConfig()
 		else if (partition_temp->partition_id == CORE_CODE_PARTITION)
 		{
 			m_partitionCore = (partition_tbl *) malloc(sizeof(struct partition_tbl));
+			if (!m_partitionCore) {
+				fprintf(stderr, "%s: Failed to allocate memory for m_partitionCore\n", __func__);
+				free(flash_cfg);
+				free(partition_temp);
+				if (m_partitionConfig) free(m_partitionConfig);
+				return UPDATE_FAIL;
+			}
 			memcpy(m_partitionCore ,partition_temp, sizeof(struct partition_tbl));
 			memset(partition_temp, 0, sizeof(struct partition_tbl));
 			fprintf(stdout, "CORE_CODE_PARTITION is found\n");
@@ -669,6 +696,14 @@ int RMI4Update::ReadFlashConfig()
 		else if (partition_temp->partition_id == GUEST_CODE_PARTITION)
 		{
 			m_partitionGuest = (partition_tbl *) malloc(sizeof(struct partition_tbl));
+			if (!m_partitionGuest) {
+				fprintf(stderr, "%s: Failed to allocate memory for m_partitionGuest\n", __func__);
+				free(flash_cfg);
+				free(partition_temp);
+				if (m_partitionConfig) free(m_partitionConfig);
+				if (m_partitionCore) free(m_partitionCore);
+				return UPDATE_FAIL;
+			}
 			memcpy(m_partitionGuest ,partition_temp, sizeof(struct partition_tbl));
 			memset(partition_temp, 0, sizeof(struct partition_tbl));
 			fprintf(stdout, "GUEST_CODE_PARTITION is found\n");

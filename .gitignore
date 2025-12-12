@@ -1,0 +1,7 @@
+# Build artifacts
+*.o
+*.so
+*.a
+rmi4update/rmi4update
+rmihidtool/rmihidtool
+f54test/f54test

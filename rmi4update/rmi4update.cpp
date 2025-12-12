@@ -554,8 +554,17 @@ int RMI4Update::ReadFlashConfig()
 	struct partition_tbl *partition_temp;
 
 	flash_cfg = (unsigned char *)malloc(m_blockSize * m_flashConfigLength);
+	if (!flash_cfg) {
+		fprintf(stderr, "%s: Failed to allocate memory for flash_cfg\n", __func__);
+		return UPDATE_FAIL;
+	}
 	memset(flash_cfg, 0, m_blockSize * m_flashConfigLength);
 	partition_temp = (partition_tbl *)malloc(sizeof(struct partition_tbl));
+	if (!partition_temp) {
+		fprintf(stderr, "%s: Failed to allocate memory for partition_temp\n", __func__);
+		free(flash_cfg);
+		return UPDATE_FAIL;
+	}
 	memset(partition_temp, 0, sizeof(struct partition_tbl));
 	/* calculate the count */
 	remain_block = (m_flashConfigLength % m_payloadLength);
@@ -615,9 +624,19 @@ int RMI4Update::ReadFlashConfig()
 
 		read_leng = transfer_leng * m_blockSize;
 		data_temp = (unsigned char *) malloc(sizeof(char) * read_leng);
+		if (!data_temp) {
+			fprintf(stderr, "%s: Failed to allocate memory for data_temp\n", __func__);
+			free(flash_cfg);
+			free(partition_temp);
+			return UPDATE_FAIL;
+		}
 		rc = m_device.Read(dataAddr + 5, data_temp, sizeof(char) * read_leng);
-		if (rc != ((ssize_t)sizeof(char) * read_leng))
+		if (rc != ((ssize_t)sizeof(char) * read_leng)) {
+			free(data_temp);
+			free(flash_cfg);
+			free(partition_temp);
 			return UPDATE_FAIL_READ_F34_QUERIES;
+		}
 
 		memcpy(flash_cfg + offset, data_temp, sizeof(char) * read_leng);
 		offset += read_leng;

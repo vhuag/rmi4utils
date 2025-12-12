@@ -67,7 +67,7 @@ enum syna_hid_report_type {
 #if defined(__arm__) || defined(__aarch64__)
 #define HID_RMI4_READ_TIMEOUT_MS	100
 #else
-#define HID_RMI4_READ_TIMEOUT_MS	10
+#define HID_RMI4_READ_TIMEOUT_MS	500
 #endif
 
 int HIDDevice::Open(const char * filename)
@@ -347,7 +347,6 @@ int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
 	int reportId;
 	int rc;
 	struct timeval tv;
-	int resendCount = 0;
 
 	tv.tv_sec = HID_RMI4_READ_TIMEOUT_MS / 1000;
 	tv.tv_usec = (HID_RMI4_READ_TIMEOUT_MS % 1000) * 1000;
@@ -365,13 +364,6 @@ int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
 		bytesPerRequest = len;
 
 	for (totalBytesRead = 0; totalBytesRead < len; totalBytesRead += bytesReadPerRequest) {
-Resend:
-		if (GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {
-			if (resendCount == 3) {
-				fprintf(stderr, "resend count exceed, return as failure\n");
-				return -1;
-			}
-		}
 		count = 0;
 		if ((len - totalBytesRead) < bytesPerRequest)
 			bytesToRequest = len % bytesPerRequest;
@@ -394,6 +386,7 @@ Resend:
 			m_bCancel = false;
 			count = write(m_fd, m_outputReport + bytesWritten,
 					m_outputReportSize - bytesWritten);
+			
 			if (count < 0) {
 				if (errno == EINTR && m_deviceOpen && !m_bCancel)
 					continue;
@@ -427,14 +420,6 @@ Resend:
 					bytesInDataReport);
 				bytesReadPerRequest += bytesInDataReport;
 				m_dataBytesRead = 0;
-				if (GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {
-					// Resend sheme is supported on TP only.
-					resendCount = 0;
-				}
-			} else if (GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {
-				fprintf(stderr, "Some error with GetReport : rc(%d), reportID(0x%x)\n", rc, reportId);
-				resendCount += 1;
-				goto Resend;
 			}
 		}
 		addr += bytesPerRequest;

@@ -538,8 +538,9 @@ int RMI4Update::rmi4update_poll()
 int RMI4Update::ReadFlashConfig()
 {
 	int rc;
+	int ret = UPDATE_SUCCESS;
 	int transaction_count, remain_block;
-	unsigned char *flash_cfg;
+	unsigned char *flash_cfg = NULL;
 	int transfer_leng = 0;
 	int read_leng = 0;
 	int offset = 0;
@@ -550,13 +551,25 @@ int RMI4Update::ReadFlashConfig()
 	unsigned short dataAddr = m_f34.GetDataBase();
 	int i;
 	int retry = 0;
-	unsigned char *data_temp;
-	struct partition_tbl *partition_temp;
+	unsigned char *data_temp = NULL;
+	struct partition_tbl *partition_temp = NULL;
 
 	flash_cfg = (unsigned char *)malloc(m_blockSize * m_flashConfigLength);
+	if (flash_cfg == NULL) {
+		fprintf(stderr, "%s: Memory allocation failure at flash_cfg\n", __func__);
+		ret = UPDATE_FAIL_MEMORY_ALLOCATION;
+		goto cleanup;
+	}
 	memset(flash_cfg, 0, m_blockSize * m_flashConfigLength);
+
 	partition_temp = (partition_tbl *)malloc(sizeof(struct partition_tbl));
-	memset(partition_temp, 0, sizeof(struct partition_tbl));
+	if (partition_temp == NULL) {
+		fprintf(stderr, "%s: Memory allocation failure at partition_temp\n", __func__);
+		ret = UPDATE_FAIL_MEMORY_ALLOCATION;
+		goto cleanup;
+	}
+	memset(partition_temp, 0, sizeof(struct partition_tbl));	
+
 	/* calculate the count */
 	remain_block = (m_flashConfigLength % m_payloadLength);
 	transaction_count = (m_flashConfigLength / m_payloadLength);
@@ -566,11 +579,15 @@ int RMI4Update::ReadFlashConfig()
 
 	/* set partition id for bootloader 7 */
 	rc = m_device.Write(dataAddr + 1, &partition_id, sizeof(partition_id));
-	if (rc != sizeof(partition_id))
-		return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+	if (rc != sizeof(partition_id)) {
+		ret = UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		goto cleanup;
+	}
 	rc = m_device.Write(dataAddr + 2, off, sizeof(off));
-	if (rc != sizeof(off))
-		return UPDATE_FAIL_WRITE_INITIAL_ZEROS;
+	if (rc != sizeof(off)) {
+		ret = UPDATE_FAIL_WRITE_INITIAL_ZEROS;
+		goto cleanup;
+	}
 
 	for (i = 0; i < transaction_count; i++)
 	{
@@ -583,8 +600,10 @@ int RMI4Update::ReadFlashConfig()
 		trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
 		trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
 		rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
-		if (rc != sizeof(trans_leng_buf))
-			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		if (rc != sizeof(trans_leng_buf)) {
+			ret = UPDATE_FAIL_WRITE_FLASH_COMMAND;
+			goto cleanup;
+		}
 
 		// Set Command to Read
 		cmd_buf[0] = (unsigned char)CMD_V7_READ;
@@ -598,7 +617,8 @@ int RMI4Update::ReadFlashConfig()
 			rc = WaitForIdle(RMI_F34_PARTITION_READ_WAIT_MS, false);
 			if (rc != UPDATE_SUCCESS) {
 				fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
-				return UPDATE_FAIL_TIMEOUT_WAITING_FOR_ATTN;
+				ret = UPDATE_FAIL_TIMEOUT_WAITING_FOR_ATTN;
+				goto cleanup;
 			}
 			fprintf(stdout, "Got attention\n");
 		}
@@ -615,13 +635,28 @@ int RMI4Update::ReadFlashConfig()
 
 		read_leng = transfer_leng * m_blockSize;
 		data_temp = (unsigned char *) malloc(sizeof(char) * read_leng);
+		if (data_temp == NULL) {
+			fprintf(stderr, "%s: Memory allocation failure at data_temp\n", __func__);
+			ret = UPDATE_FAIL_MEMORY_ALLOCATION;
+			goto cleanup;
+		}
 		rc = m_device.Read(dataAddr + 5, data_temp, sizeof(char) * read_leng);
-		if (rc != ((ssize_t)sizeof(char) * read_leng))
-			return UPDATE_FAIL_READ_F34_QUERIES;
+		if (rc != ((ssize_t)sizeof(char) * read_leng)) {
+			ret = UPDATE_FAIL_READ_F34_QUERIES;
+			goto cleanup;
+		}
+
+		// Validate that the memcpy won't overflow the flash_cfg buffer
+		if (offset + read_leng > (int)(m_blockSize * m_flashConfigLength)) {
+			fprintf(stderr, "%s: Buffer overflow detected\n", __func__);
+			ret = UPDATE_FAIL_READ_F34_QUERIES;
+			goto cleanup;
+		}
 
 		memcpy(flash_cfg + offset, data_temp, sizeof(char) * read_leng);
 		offset += read_leng;
 		free(data_temp);
+		data_temp = NULL;
 	}
 
 	// Initialize as NULL here to avoid segmentation fault.
@@ -636,6 +671,11 @@ int RMI4Update::ReadFlashConfig()
 		if (partition_temp->partition_id == CORE_CONFIG_PARTITION)
 		{
 			m_partitionConfig = (partition_tbl *) malloc(sizeof(struct partition_tbl));
+			if (m_partitionConfig == NULL) {
+				fprintf(stderr, "%s: Memory allocation failure at m_partitionConfig\n", __func__);
+				ret = UPDATE_FAIL_MEMORY_ALLOCATION;
+				goto cleanup;
+			}
 			memcpy(m_partitionConfig ,partition_temp, sizeof(struct partition_tbl));
 			memset(partition_temp, 0, sizeof(struct partition_tbl));
 			fprintf(stdout, "CORE_CONFIG_PARTITION is found\n");
@@ -643,6 +683,11 @@ int RMI4Update::ReadFlashConfig()
 		else if (partition_temp->partition_id == CORE_CODE_PARTITION)
 		{
 			m_partitionCore = (partition_tbl *) malloc(sizeof(struct partition_tbl));
+			if (m_partitionCore == NULL) {
+				fprintf(stderr, "%s: Memory allocation failure at m_partitionCore\n", __func__);
+				ret = UPDATE_FAIL_MEMORY_ALLOCATION;
+				goto cleanup;
+			}
 			memcpy(m_partitionCore ,partition_temp, sizeof(struct partition_tbl));
 			memset(partition_temp, 0, sizeof(struct partition_tbl));
 			fprintf(stdout, "CORE_CODE_PARTITION is found\n");
@@ -650,6 +695,11 @@ int RMI4Update::ReadFlashConfig()
 		else if (partition_temp->partition_id == GUEST_CODE_PARTITION)
 		{
 			m_partitionGuest = (partition_tbl *) malloc(sizeof(struct partition_tbl));
+			if (m_partitionGuest == NULL) {
+				fprintf(stderr, "%s: Memory allocation failure at m_partitionGuest\n", __func__);
+				ret = UPDATE_FAIL_MEMORY_ALLOCATION;
+				goto cleanup;
+			}
 			memcpy(m_partitionGuest ,partition_temp, sizeof(struct partition_tbl));
 			memset(partition_temp, 0, sizeof(struct partition_tbl));
 			fprintf(stdout, "GUEST_CODE_PARTITION is found\n");
@@ -657,12 +707,6 @@ int RMI4Update::ReadFlashConfig()
 		else if (partition_temp->partition_id == NONE_PARTITION)
 			break;
 	}
-
-	if (flash_cfg)
-		free(flash_cfg);
-
-	if (partition_temp)
-		free(partition_temp);
 
 	m_fwBlockCount = m_partitionCore ? m_partitionCore->partition_len : 0;
 	m_configBlockCount = m_partitionConfig ? m_partitionConfig->partition_len : 0;
@@ -679,7 +723,16 @@ int RMI4Update::ReadFlashConfig()
 			memset(m_guestData + m_guestBlockCount * m_blockSize -4, 0, 4);
 		}
 	}
-	return UPDATE_SUCCESS;
+
+cleanup:
+	if (flash_cfg)
+		free(flash_cfg);
+	if (partition_temp)
+		free(partition_temp);
+	if(data_temp)
+		free(data_temp);
+
+	return ret;
 }
 
 int RMI4Update::ReadF34QueriesV7()

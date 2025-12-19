@@ -53,6 +53,7 @@ enum update_error {
 	UPDATE_FAIL_OPEN_FIRMWARE_IMAGE,
 	UPDATE_FAIL_WRITE_PROTECTED,
 	UPDATE_FAIL_MSL_CHECKING,
+	UPDATE_FAIL_MEMORY_ALLOCATION,
 };
 
 const char * update_err_to_string(int err);

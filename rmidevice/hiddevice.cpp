@@ -59,8 +59,9 @@ enum syna_hid_report_type {
 #define HID_RMI4_WRITE_OUTPUT_ADDR		2
 #define HID_RMI4_WRITE_OUTPUT_DATA		4
 #define HID_RMI4_FEATURE_MODE			1
-#define HID_RMI4_ATTN_INTERUPT_SOURCES		1
-#define HID_RMI4_ATTN_DATA			2
+#define HID_RMI4_ATTN_INTERRUPT_SOURCES 1
+#define HID_RMI4_ATTN_DATA              2
+#define HID_RMI4_READREPORT_MAX_RETRY   10
 
 #define SYNAPTICS_VENDOR_ID			0x06cb
 
@@ -346,6 +347,7 @@ int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
 	size_t bytesToRequest;
 	int reportId;
 	int rc;
+	int timeoutCount = 0;
 	struct timeval tv;
 
 	tv.tv_sec = HID_RMI4_READ_TIMEOUT_MS / 1000;
@@ -399,13 +401,24 @@ int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
 		bytesReadPerRequest = 0;
 		while (bytesReadPerRequest < bytesToRequest) {
 			if (GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {
-				// Add timeout 10 ms for select() called in GetReport().
+				// Add timeout 500 ms for select() called in GetReport().
 				rc = GetReport(&reportId, &tv);
+				if (rc == -ETIMEDOUT) {
+					timeoutCount++;
+					if (timeoutCount >= HID_RMI4_READREPORT_MAX_RETRY) {
+						fprintf(stderr, "%s: Failed due to timeout after %d retries\n", 
+							__func__, HID_RMI4_READREPORT_MAX_RETRY);
+						return -1;
+					}
+					continue;
+				}
 			} else {
 				// Touch Screen
 				rc = GetReport(&reportId);
 			}
+			
 			if (rc > 0 && reportId == RMI_READ_DATA_REPORT_ID) {
+				timeoutCount = 0;
 				if (static_cast<ssize_t>(m_inputReportSize) <
 				    std::max(HID_RMI4_READ_INPUT_COUNT,
 					     HID_RMI4_READ_INPUT_DATA)){
@@ -584,10 +597,10 @@ int HIDDevice::GetAttentionReport(struct timeval * timeout, unsigned int source_
 					}
 				}
 
-				if (m_inputReportSize < HID_RMI4_ATTN_INTERUPT_SOURCES + 1)
+				if (m_inputReportSize < HID_RMI4_ATTN_INTERRUPT_SOURCES + 1)
 					return -1;
 
-				if (source_mask & m_attnData[HID_RMI4_ATTN_INTERUPT_SOURCES])
+				if (source_mask & m_attnData[HID_RMI4_ATTN_INTERRUPT_SOURCES])
 					return rc;
 			}
 		} else {
@@ -696,7 +709,7 @@ void HIDDevice::PrintReport(const unsigned char *report)
 			len = 28;
 			data = &report[HID_RMI4_ATTN_DATA];
 			fprintf(stdout, "Interrupt Sources: 0x%02X\n", 
-				report[HID_RMI4_ATTN_INTERUPT_SOURCES]);
+				report[HID_RMI4_ATTN_INTERRUPT_SOURCES]);
 			break;
 		default:
 			fprintf(stderr, "Unknown Report: ID 0x%02x\n", report[HID_RMI4_REPORT_ID]);

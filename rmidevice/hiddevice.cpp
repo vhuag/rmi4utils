@@ -158,11 +158,11 @@ int HIDDevice::Open(const char * filename)
 	m_deviceOpen = true;
 
 	// Determine which mode the device is currently running in based on the current HID driver
-	// hid-rmi indicated RMI Mode 1 all others would be Mode 0
+	// hid-rmi indicated RMI Mode 3 all others would be Mode 0
 	if (LookupHidDeviceName(m_info.bustype, m_info.vendor, m_info.product, hidDeviceName)) {
 		if (LookupHidDriverName(hidDeviceName, hidDriverName)) {
 			if (hidDriverName == "hid-rmi")
-				m_initialMode = HID_RMI4_MODE_ATTN_REPORTS;
+				m_initialMode = HID_RMI4_MODE_IN_SYSTEM;
 		}
 	}
 

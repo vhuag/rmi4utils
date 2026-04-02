@@ -28,6 +28,7 @@ enum rmi_hid_mode_type {
 	HID_RMI4_MODE_MOUSE                     = 0,
 	HID_RMI4_MODE_ATTN_REPORTS              = 1,
 	HID_RMI4_MODE_NO_PACKED_ATTN_REPORTS    = 2,
+	HID_RMI4_MODE_IN_SYSTEM                 = 3,
 };
 
 class HIDDevice : public RMIDevice
@@ -39,7 +40,7 @@ public:
 		      m_outputReportSize(0),
 		      m_featureReportSize(0),
 		      m_deviceOpen(false),
-		      m_mode(HID_RMI4_MODE_ATTN_REPORTS),
+		      m_mode(HID_RMI4_MODE_IN_SYSTEM),
 		      m_initialMode(HID_RMI4_MODE_MOUSE),
 		      m_transportDeviceName(""),
 		      m_driverPath(""),

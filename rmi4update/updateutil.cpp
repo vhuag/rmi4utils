@@ -53,6 +53,11 @@ const char *update_error_str[] = {
 	"invalid parameter",						// UPDATE_FAIL_INVALID_PARAMETER
 	"failed to open firmware image file",				// UPDATE_FAIL_OPEN_FIRMWARE_IMAGE
 	"write protection is activated",			// UPDATE_FAIL_WRITE_PROTECTED
+	"MSL checking failed",					// UPDATE_FAIL_MSL_CHECKING
+	"memory allocation failure",				// UPDATE_FAIL_MEMORY_ALLOCATION
+	"partition does not match between image and device",	// UPDATE_FAIL_PARTITION_NOT_MATCH
+	"partition total size does not match",			// UPDATE_FAIL_PARTITION_SIZE_NOT_MATCH
+	"partition start address does not match",		// UPDATE_FAIL_PARTITION_START_ADDR_NOT_MATCH
 };
 
 const char * update_err_to_string(int err)

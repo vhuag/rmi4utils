@@ -71,6 +71,8 @@ public:
 	virtual bool FindDevice(enum RMIDeviceType type = RMI_DEVICE_TYPE_ANY);
 	virtual bool CheckABSEvent();
 
+	virtual int GetDesiredMode() const { return (int)m_mode; }	
+
 private:
 	int m_fd;
 

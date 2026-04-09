@@ -162,11 +162,12 @@ int HIDDevice::Open(const char * filename)
 	if (LookupHidDeviceName(m_info.bustype, m_info.vendor, m_info.product, hidDeviceName)) {
 		if (LookupHidDriverName(hidDeviceName, hidDriverName)) {
 			if (hidDriverName == "hid-rmi")
-				m_initialMode = HID_RMI4_MODE_IN_SYSTEM;
+				m_initialMode = HID_RMI4_MODE_ATTN_REPORTS;
 		}
 	}
 
 	if (m_initialMode != m_mode) {
+		fprintf(stdout, "Switching from initial mode %d to mode %d\n", m_initialMode, m_mode);
 		rc = SetMode(m_mode);
 		if (rc) {
 			rc = -1;
@@ -491,6 +492,8 @@ int HIDDevice::SetMode(int mode)
 	
 	if (!m_deviceOpen)
 		return -1;
+	
+	fprintf(stdout, "Setting RMI mode to %d\n", mode);
 
 	buf[0] = RMI_SET_RMI_MODE_REPORT_ID;
 	buf[1] = mode;
@@ -548,8 +551,11 @@ void HIDDevice::Close()
 	if (!m_deviceOpen)
 		return;
 
-	if (m_initialMode != m_mode)
+	if (m_initialMode != m_mode) {
+		fprintf(stdout, "Restoring initial mode %d\n", m_initialMode);
 		SetMode(m_initialMode);
+	}
+		
 
 	m_deviceOpen = false;
 	close(m_fd);
@@ -588,6 +594,7 @@ int HIDDevice::GetAttentionReport(struct timeval * timeout, unsigned int source_
 				// was copied. Some callers won't care about the contents
 				// of the report so failing to copy the data should not return
 				// an error.
+				fprintf(stdout, "Attention Report:\n");
 				if (buf && len) {
 					if (*len >= m_inputReportSize) {
 						*len = m_inputReportSize;
@@ -600,7 +607,11 @@ int HIDDevice::GetAttentionReport(struct timeval * timeout, unsigned int source_
 				if (m_inputReportSize < HID_RMI4_ATTN_INTERRUPT_SOURCES + 1)
 					return -1;
 
-				if (source_mask & m_attnData[HID_RMI4_ATTN_INTERRUPT_SOURCES])
+				// Check interrupt sources in the report against the source mask passed in. 
+				// If the source mask is 0 then ignore the sources in the report and return immediately.	
+				// If a source mask was provided then check if any of the sources indicated in the report match those in the mask. 
+				// If not, then continue waiting until timeout expires or a matching report is received.
+				if (!source_mask || (source_mask & m_attnData[HID_RMI4_ATTN_INTERRUPT_SOURCES]))
 					return rc;
 			}
 		} else {

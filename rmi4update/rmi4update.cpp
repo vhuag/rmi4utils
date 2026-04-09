@@ -103,6 +103,8 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 	long long int duration_us = 0;
 	int rc;
 	const unsigned char eraseAll = RMI_F34_ERASE_ALL;
+	int sblFirmwareVersionMajor = 0;
+	int sblFirmwareVersionMinor = 0;
 
 	// Clear all interrupts before parsing to avoid unexpected interrupts.
 	m_device.ToggleInterruptMask(false);
@@ -152,7 +154,6 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 	if (rc != UPDATE_SUCCESS)
 		return rc;
 
-
 	if (GetDeviceBootloaderVersion() < BL_V10) {
 		// Checking size alignment for the device prior to BL v10.
 		rc = m_firmwareImage.VerifyImageMatchesDevice(GetFirmwareSize(), GetConfigSize());
@@ -161,9 +162,48 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 			return rc;
 		}
 	} 
-	
-	int sblFirmwareVersionMajor = 0;
-	int sblFirmwareVersionMinor = 0;
+
+	// Parse image-side flash config and compare partitions with device.
+	//   BL v7+: CheckEachPartitionSize (check partition size for each partition)
+	//   BL v10.1+: CheckEachPartitionExistence (check all partitions exist on both sides)
+	//   BL v8~v10: CheckTotalPartitionSize + CheckStartAddr (check total size and flash config address)
+	if (GetDeviceBootloaderVersion() >= BL_V7) {
+		rc = ParseImageFlashConfig();
+		if (rc != UPDATE_SUCCESS) {
+			fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
+			goto reset;
+		}
+
+		rc = CheckEachPartitionSize();
+		if (rc != UPDATE_SUCCESS) {
+			fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
+			goto reset;
+		}
+
+		if (GetDeviceBootloaderVersion() >= BL_V8) {
+			if (GetDeviceBootloaderVersion() >= BL_V10_1) {
+				// BL v10.1+: check that all partitions exist on both sides
+				rc = CheckEachPartitionExistence();
+				if (rc != UPDATE_SUCCESS) {
+					fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
+					goto reset;
+				}
+			} else {
+				// BL v7~v10: check total firmware size and flash config start address
+				rc = CheckTotalPartitionSize();
+				if (rc != UPDATE_SUCCESS) {
+					fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
+					goto reset;
+				}
+
+				rc = CheckStartAddr(FLASH_CONFIG_PARTITION);
+				if (rc != UPDATE_SUCCESS) {
+					fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
+					goto reset;
+				}
+			}
+		}
+	}
 
 	if (m_firmwareImage.HasSBL()) {
 		if (m_hasSBL) {
@@ -659,62 +699,130 @@ int RMI4Update::ReadFlashConfig()
 		data_temp = NULL;
 	}
 
-	// Initialize as NULL here to avoid segmentation fault.
+	// Initialize all partition pointers as NULL to avoid segmentation fault.
 	m_partitionConfig = NULL;
 	m_partitionCore = NULL;
 	m_partitionGuest = NULL;
+	m_partitionBootloader = NULL;
+	m_partitionDeviceConfig = NULL;
+	m_partitionFlashConfigEntry = NULL;
+	m_partitionManufacturingBlock = NULL;
+	m_partitionGuestSerialization = NULL;
+	m_partitionGlobalParameters = NULL;
+	m_partitionDisplayConfig = NULL;
+	m_partitionExternalTouchAFEConfig = NULL;
+	m_partitionUtilityParameter = NULL;
+	m_partitionFLD = NULL;
+	m_partitionSBMB = NULL;
+	m_partitionCount = 0;
 
-	/* parse the config length */
-	for (i = 2; i < m_blockSize * m_flashConfigLength; i = i + 8)
+	/* Parse all partitions from flash config data.
+	 * Each partition entry is 10 bytes (struct partition_tbl), starting at offset 2.
+	 */
+	if (m_device.m_hasDebug) {
+		fprintf(stdout, "\n=== Partition Table (from Flash Config) ===\n");
+		fprintf(stdout, "%-4s %-24s %-10s %-10s %-10s %-8s\n",
+			"ID", "Name", "Length", "Address", "Properties", "CRCType");
+		fprintf(stdout, "-----------------------------------------------------------------------\n");
+	}
+
+	for (i = 2; i < m_blockSize * m_flashConfigLength; i = i + 10)
 	{
-		memcpy(partition_temp->data ,flash_cfg + i, sizeof(struct partition_tbl));
-		if (partition_temp->partition_id == CORE_CONFIG_PARTITION)
-		{
-			m_partitionConfig = (partition_tbl *) malloc(sizeof(struct partition_tbl));
-			if (m_partitionConfig == NULL) {
-				fprintf(stderr, "%s: Memory allocation failure at m_partitionConfig\n", __func__);
-				ret = UPDATE_FAIL_MEMORY_ALLOCATION;
-				goto cleanup;
-			}
-			memcpy(m_partitionConfig ,partition_temp, sizeof(struct partition_tbl));
-			memset(partition_temp, 0, sizeof(struct partition_tbl));
-			fprintf(stdout, "CORE_CONFIG_PARTITION is found\n");
-		}
-		else if (partition_temp->partition_id == CORE_CODE_PARTITION)
-		{
-			m_partitionCore = (partition_tbl *) malloc(sizeof(struct partition_tbl));
-			if (m_partitionCore == NULL) {
-				fprintf(stderr, "%s: Memory allocation failure at m_partitionCore\n", __func__);
-				ret = UPDATE_FAIL_MEMORY_ALLOCATION;
-				goto cleanup;
-			}
-			memcpy(m_partitionCore ,partition_temp, sizeof(struct partition_tbl));
-			memset(partition_temp, 0, sizeof(struct partition_tbl));
-			fprintf(stdout, "CORE_CODE_PARTITION is found\n");
-		}
-		else if (partition_temp->partition_id == GUEST_CODE_PARTITION)
-		{
-			m_partitionGuest = (partition_tbl *) malloc(sizeof(struct partition_tbl));
-			if (m_partitionGuest == NULL) {
-				fprintf(stderr, "%s: Memory allocation failure at m_partitionGuest\n", __func__);
-				ret = UPDATE_FAIL_MEMORY_ALLOCATION;
-				goto cleanup;
-			}
-			memcpy(m_partitionGuest ,partition_temp, sizeof(struct partition_tbl));
-			memset(partition_temp, 0, sizeof(struct partition_tbl));
-			fprintf(stdout, "GUEST_CODE_PARTITION is found\n");
-		}
-		else if (partition_temp->partition_id == NONE_PARTITION)
+		memcpy(partition_temp->data, flash_cfg + i, sizeof(struct partition_tbl));
+
+		if (partition_temp->partition_id == NONE_PARTITION)
 			break;
+
+		if (m_device.m_hasDebug) {
+			/* Print each partition entry: ID, name, length (blocks), address, properties, CRC type */
+			fprintf(stdout, "0x%02X %-24s %-10d 0x%04X     0x%04X     0x%02X\n",
+				partition_temp->partition_id,
+				GetPartitionName(partition_temp->partition_id),
+				partition_temp->partition_len,
+				partition_temp->partition_addr,
+				partition_temp->partition_prop,
+				partition_temp->partition_crc_type);
+		}
+		m_partitionCount++;
+
+		/* Allocate and store each recognized partition */
+		struct partition_tbl **target = NULL;
+
+		switch (partition_temp->partition_id) {
+		case BOOTLOADER_PARTITION:
+			target = &m_partitionBootloader;
+			break;
+		case DEVICE_CONFIG_PARTITION:
+			target = &m_partitionDeviceConfig;
+			break;
+		case FLASH_CONFIG_PARTITION:
+			target = &m_partitionFlashConfigEntry;
+			break;
+		case MANUFACTURING_BLOCK_PARTITION:
+			target = &m_partitionManufacturingBlock;
+			break;
+		case GUEST_SERIALIZATION_PARTITION:
+			target = &m_partitionGuestSerialization;
+			break;
+		case GLOBAL_PARAMETERS_PARTITION:
+			target = &m_partitionGlobalParameters;
+			break;
+		case CORE_CODE_PARTITION:
+			target = &m_partitionCore;
+			break;
+		case CORE_CONFIG_PARTITION:
+			target = &m_partitionConfig;
+			break;
+		case GUEST_CODE_PARTITION:
+			target = &m_partitionGuest;
+			break;
+		case DISPLAY_CONFIG_PARTITION:
+			target = &m_partitionDisplayConfig;
+			break;
+		case EXTERNAL_TOUCH_AFE_CONFIG_PARTITION:
+			target = &m_partitionExternalTouchAFEConfig;
+			break;
+		case UTILITY_PARAMETER_PARTITION:
+			target = &m_partitionUtilityParameter;
+			break;
+		case FIXED_LOCATION_DATA_PARTITION:
+			target = &m_partitionFLD;
+			break;
+		case SBMB_PARTITION:
+			target = &m_partitionSBMB;
+			break;
+		default:
+			/* Unknown or unhandled partition, skip storage */
+			break;
+		}
+
+		if (target) {
+			*target = (partition_tbl *) malloc(sizeof(struct partition_tbl));
+			if (*target == NULL) {
+				fprintf(stderr, "%s: Memory allocation failure for partition 0x%02X (%s)\n",
+					__func__, partition_temp->partition_id,
+					GetPartitionName(partition_temp->partition_id));
+				ret = UPDATE_FAIL_MEMORY_ALLOCATION;
+				goto cleanup;
+			}
+			memcpy(*target, partition_temp, sizeof(struct partition_tbl));
+		}
+
+		memset(partition_temp, 0, sizeof(struct partition_tbl));
+	}
+
+	if (m_device.m_hasDebug) {
+		fprintf(stdout, "---------------------------------------------------------------\n");
+		fprintf(stdout, "Total partitions found: %d\n\n", m_partitionCount);
 	}
 
 	m_fwBlockCount = m_partitionCore ? m_partitionCore->partition_len : 0;
 	m_configBlockCount = m_partitionConfig ? m_partitionConfig->partition_len : 0;
 	m_guestBlockCount = m_partitionGuest ? m_partitionGuest->partition_len : 0;
+
 	fprintf(stdout, "F34 fw blocks:     %d\n", m_fwBlockCount);
 	fprintf(stdout, "F34 config blocks: %d\n", m_configBlockCount);
-	fprintf(stdout, "F34 guest blocks:     %d\n", m_guestBlockCount);
-	fprintf(stdout, "\n");
+	fprintf(stdout, "F34 guest blocks:  %d\n", m_guestBlockCount);
 
 	if(m_partitionGuest != NULL && (m_guestBlockCount * m_blockSize) >= 4) {
 		m_guestData = (unsigned char *) malloc(m_guestBlockCount * m_blockSize);
@@ -733,6 +841,194 @@ cleanup:
 		free(data_temp);
 
 	return ret;
+}
+
+struct partition_tbl * RMI4Update::GetDevicePartition(int id)
+{
+	switch (id) {
+		case BOOTLOADER_PARTITION:              return m_partitionBootloader;
+		case DEVICE_CONFIG_PARTITION:           return m_partitionDeviceConfig;
+		case FLASH_CONFIG_PARTITION:            return m_partitionFlashConfigEntry;
+		case MANUFACTURING_BLOCK_PARTITION:     return m_partitionManufacturingBlock;
+		case GUEST_SERIALIZATION_PARTITION:     return m_partitionGuestSerialization;
+		case GLOBAL_PARAMETERS_PARTITION:       return m_partitionGlobalParameters;
+		case CORE_CODE_PARTITION:               return m_partitionCore;
+		case CORE_CONFIG_PARTITION:             return m_partitionConfig;
+		case GUEST_CODE_PARTITION:              return m_partitionGuest;
+		case DISPLAY_CONFIG_PARTITION:          return m_partitionDisplayConfig;
+		case EXTERNAL_TOUCH_AFE_CONFIG_PARTITION: return m_partitionExternalTouchAFEConfig;
+		case UTILITY_PARAMETER_PARTITION:       return m_partitionUtilityParameter;
+		case FIXED_LOCATION_DATA_PARTITION:     return m_partitionFLD;
+		case SBMB_PARTITION:                    return m_partitionSBMB;
+		default:                                return NULL;
+	}
+}
+
+int RMI4Update::ParseImageFlashConfig()
+{
+	unsigned char *imgFlashCfg = m_firmwareImage.GetFlashConfigData();
+	unsigned long imgFlashCfgSize = m_firmwareImage.GetFlashConfigSize();
+
+	memset(m_imgPartitions, 0, sizeof(m_imgPartitions));
+
+	if (!imgFlashCfg || imgFlashCfgSize <= 2) {
+		fprintf(stdout, "Image has no flash config data, skip image partition parsing\n");
+		return UPDATE_SUCCESS;
+	}
+
+	struct partition_tbl entry;
+	int idx;
+
+	fprintf(stdout, "\n=== Image Partition Table (from firmware image flash config) ===\n");
+	fprintf(stdout, "%-4s %-24s %-10s %-10s %-10s %-8s\n",
+		"ID", "Name", "Length", "Address", "Properties", "CRCType");
+	fprintf(stdout, "-----------------------------------------------------------------------\n");
+
+	for (idx = 2; idx + 10 <= (int)imgFlashCfgSize; idx += 10) {
+		memcpy(entry.data, imgFlashCfg + idx, sizeof(struct partition_tbl));
+
+		if (entry.partition_id == NONE_PARTITION)
+			break;
+
+		if (entry.partition_id >= MAX_PARTITION_ID) {
+			fprintf(stderr, "  >> unknown partition id 0x%02X, skipping\n",
+				entry.partition_id);
+			continue;
+		}
+
+		fprintf(stdout, "0x%02X %-24s %-10d 0x%04X     0x%04X     0x%02X\n",
+			entry.partition_id,
+			GetPartitionName(entry.partition_id),
+			entry.partition_len,
+			entry.partition_addr,
+			entry.partition_prop,
+			entry.partition_crc_type);
+
+		memcpy(&m_imgPartitions[entry.partition_id], &entry, sizeof(struct partition_tbl));
+	}
+	fprintf(stdout, "=== End Image Partition Table ===\n\n");
+
+	return UPDATE_SUCCESS;
+}
+
+// CheckEachPartitionExistence - check that each partition exists on both image and device.
+int RMI4Update::CheckEachPartitionExistence()
+{
+	bool success = true;
+
+	for (int i = 1; i < MAX_PARTITION_ID; i++) {
+		struct partition_tbl *devPart = GetDevicePartition(i);
+		unsigned short imgLen = m_imgPartitions[i].partition_len;
+		unsigned short devLen = devPart ? devPart->partition_len : 0;
+
+		if (imgLen == 0 && devLen != 0) {
+			fprintf(stderr, "%s partition doesn't exist in image file.\n",
+				GetPartitionName(i));
+			success = false;
+		} else if (imgLen != 0 && devLen == 0) {
+			fprintf(stderr, "%s partition doesn't exist in device.\n",
+				GetPartitionName(i));
+			success = false;
+		}
+	}
+
+	if (!success) {
+		fprintf(stderr, "Partition mismatch between image and device\n");
+		return UPDATE_FAIL_PARTITION_NOT_MATCH;
+	}
+
+	fprintf(stdout, "CheckEachPartitionExistence: all partitions match\n");
+	return UPDATE_SUCCESS;
+}
+
+
+// CheckEachPartitionSize - compare partition_len for each partition between image and device.
+int RMI4Update::CheckEachPartitionSize()
+{
+	bool success = true;
+
+	fprintf(stdout, "\n=== Check Each Partition Size (image vs device) ===\n");
+
+	for (int i = 1; i < MAX_PARTITION_ID; i++) {
+		struct partition_tbl *devPart = GetDevicePartition(i);
+		unsigned short imgLen = m_imgPartitions[i].partition_len;
+		unsigned short devLen = devPart ? devPart->partition_len : 0;
+
+		/* Skip if neither side has this partition */
+		if (imgLen == 0 && devLen == 0)
+			continue;
+
+		if (imgLen != devLen) {
+			fprintf(stderr, "  %s: SIZE MISMATCH image=%d blocks, device=%d blocks\n",
+				GetPartitionName(i), imgLen, devLen);
+			success = false;
+		} else {
+			fprintf(stdout, "  %s: size match (%d blocks)\n",
+				GetPartitionName(i), imgLen);
+		}
+	}
+
+	if (!success) {
+		fprintf(stderr, "Partition size mismatch detected\n");
+		return UPDATE_FAIL_PARTITION_SIZE_NOT_MATCH;
+	}
+
+	fprintf(stdout, "CheckEachPartitionSize: all partition sizes match\n\n");
+	return UPDATE_SUCCESS;
+}
+
+// CheckTotalPartitionSize - compare total partition lengths between image and device.
+int RMI4Update::CheckTotalPartitionSize()
+{
+	int dev_len = 0, img_len = 0;
+
+	for (int i = 1; i < MAX_PARTITION_ID; i++) {
+		struct partition_tbl *devPart = GetDevicePartition(i);
+		if (devPart) {
+			img_len += m_imgPartitions[i].partition_len;
+			dev_len += devPart->partition_len;
+		}
+	}
+
+	fprintf(stdout, "CheckTotalPartitionSize: image total=%d blocks, device total=%d blocks\n",
+		img_len, dev_len);
+
+	if (img_len != dev_len) {
+		fprintf(stderr, "Application area size does not match with device.\n");
+		return UPDATE_FAIL_PARTITION_SIZE_NOT_MATCH;
+	}
+
+	return UPDATE_SUCCESS;
+}
+
+
+//CheckStartAddr - compare start physical block address for a specific partition.
+int RMI4Update::CheckStartAddr(int partition_id)
+{
+	if (partition_id <= NONE_PARTITION || partition_id >= MAX_PARTITION_ID)
+		return UPDATE_SUCCESS;
+
+	struct partition_tbl *devPart = GetDevicePartition(partition_id);
+	if (!devPart)
+		return UPDATE_SUCCESS;
+
+	unsigned short imgAddr = m_imgPartitions[partition_id].partition_addr;
+	unsigned short devAddr = devPart->partition_addr;
+
+	/* Skip check if either address is 0 (partition may not have meaningful address) */
+	if (imgAddr == 0 || devAddr == 0)
+		return UPDATE_SUCCESS;
+
+	if (imgAddr != devAddr) {
+		fprintf(stderr, "%s start physical block address is not matched with device. "
+			"(image=0x%04X, device=0x%04X)\n",
+			GetPartitionName(partition_id), imgAddr, devAddr);
+		return UPDATE_FAIL_PARTITION_START_ADDR_NOT_MATCH;
+	}
+
+	fprintf(stdout, "CheckStartAddr: %s address match (0x%04X)\n",
+		GetPartitionName(partition_id), imgAddr);
+	return UPDATE_SUCCESS;
 }
 
 int RMI4Update::ReadF34QueriesV7()
@@ -797,12 +1093,7 @@ int RMI4Update::ReadF34QueriesV7()
 	fprintf(stdout, "F34 payload length:%d\n", m_payloadLength);
 	fprintf(stdout, "F34 build id:      %lu\n", m_buildID);
 
-	if ((m_device.GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) && (m_bootloaderID[1] == 10)) {
-		// FW size would be different from the one in image file in bootloader v10,
-		// we use size parsing in image file instead.
-		return UPDATE_SUCCESS;
-	} else 
-		return ReadFlashConfig();
+	return ReadFlashConfig();
 }
 
 int RMI4Update::ReadF34Queries()
@@ -1905,6 +2196,10 @@ int RMI4Update::EnterFlashProgrammingV7()
 
 	Sleep(RMI_F34_ENABLE_WAIT_MS);
 
+	if(m_device.GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {
+		m_device.SetMode(m_device.GetDesiredMode());
+	}
+
 	rc = FindUpdateFunctions();
 	if (rc != UPDATE_SUCCESS)
 		return rc;
@@ -1950,6 +2245,7 @@ int RMI4Update::EnterFlashProgramming()
 		return UPDATE_FAIL_PROGRAMMING_NOT_ENABLED;
 
 	fprintf(stdout, "Programming is enabled.\n");
+
 	rc = FindUpdateFunctions();
 	if (rc != UPDATE_SUCCESS)
 		return rc;
@@ -2143,7 +2439,11 @@ int RMI4Update::WaitForIdle(int timeout_ms, bool readF34OnSucess)
 		tv.tv_sec = timeout_ms / 1000;
 		tv.tv_usec = (timeout_ms % 1000) * 1000;
 
-		rc = m_device.WaitForAttention(&tv, m_f34.GetInterruptMask());
+		// For touchpad case, we cannot receive the ATTN with RMI function ID inclded.
+		// Skip the interrupt mask when waiting for ATTN report to make sure we can receive the ATTN report.
+		bool skipInterruptMask = (m_device.GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) ? true : false;
+
+		rc = m_device.WaitForAttention(&tv, skipInterruptMask ? 0 : m_f34.GetInterruptMask());
 		if (rc == -ETIMEDOUT){
 			/*
 			 * If for some reason we are not getting attention reports for HID devices
@@ -2474,6 +2774,10 @@ int RMI4Update::EnterSBLModeV10_1()
 		fprintf(stdout, "%s\n", __func__);
 		if (!m_inBLmode)
 			return UPDATE_FAIL_DEVICE_NOT_IN_BOOTLOADER;
+
+		if(m_device.GetDeviceType() == RMI_DEVICE_TYPE_TOUCHPAD) {
+			m_device.SetMode(m_device.GetDesiredMode());
+		}
 			
 	} 
 	Sleep(RMI_F34_ENABLE_WAIT_MS);

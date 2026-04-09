@@ -54,6 +54,30 @@ enum v7_partition_id {
 	EXTERNAL_TOUCH_AFE_CONFIG_PARTITION,
 	UTILITY_PARAMETER_PARTITION,
 	FIXED_LOCATION_DATA_PARTITION = 0x0E,
+	SBMB_PARTITION = 0x0F,
+	MAX_PARTITION_ID
+};
+
+static inline const char *GetPartitionName(int id)
+{
+	switch (id) {
+	case NONE_PARTITION:                     return "None";
+	case BOOTLOADER_PARTITION:               return "Bootloader";
+	case DEVICE_CONFIG_PARTITION:            return "DeviceConfig";
+	case FLASH_CONFIG_PARTITION:             return "FlashConfig";
+	case MANUFACTURING_BLOCK_PARTITION:      return "ManufacturingBlock";
+	case GUEST_SERIALIZATION_PARTITION:      return "GuestSerialization";
+	case GLOBAL_PARAMETERS_PARTITION:        return "GlobalParameters";
+	case CORE_CODE_PARTITION:                return "CoreCode";
+	case CORE_CONFIG_PARTITION:              return "CoreConfig";
+	case GUEST_CODE_PARTITION:               return "GuestCode";
+	case DISPLAY_CONFIG_PARTITION:           return "DisplayConfig";
+	case EXTERNAL_TOUCH_AFE_CONFIG_PARTITION:return "ExternalTouchAFEConfig";
+	case UTILITY_PARAMETER_PARTITION:        return "UtilityParameter";
+	case FIXED_LOCATION_DATA_PARTITION:      return "FixedLocationData";
+	case SBMB_PARTITION:                     return "SBMB";
+	default:                                 return "Unknown";
+	}
 };
 
 enum v7_flash_command {
@@ -152,8 +176,10 @@ struct partition_tbl
 			unsigned short partition_len;
 			unsigned short partition_addr;
 			unsigned short partition_prop;
+			unsigned char  partition_crc_type;
+			unsigned char  reserved;
 		} __attribute__((packed));;
-		unsigned char data[8];
+		unsigned char data[10];
 	};
 };
 // leon end
@@ -177,6 +203,12 @@ private:
 	int DisableNonessentialInterupts();
 	int FindUpdateFunctions();
 	int ReadFlashConfig();
+	int ParseImageFlashConfig();
+	int CheckEachPartitionExistence();
+	int CheckEachPartitionSize();
+	int CheckTotalPartitionSize();
+	int CheckStartAddr(int partition_id);
+	struct partition_tbl * GetDevicePartition(int id);
 	int rmi4update_poll();
 	int ReadF34QueriesV7();
 	int ReadF34Queries();
@@ -234,6 +266,19 @@ private:
 	struct partition_tbl *m_partitionCore;
 	struct partition_tbl *m_partitionConfig;
 	struct partition_tbl *m_partitionGuest;
+	struct partition_tbl *m_partitionBootloader;
+	struct partition_tbl *m_partitionDeviceConfig;
+	struct partition_tbl *m_partitionFlashConfigEntry;
+	struct partition_tbl *m_partitionManufacturingBlock;
+	struct partition_tbl *m_partitionGuestSerialization;
+	struct partition_tbl *m_partitionGlobalParameters;
+	struct partition_tbl *m_partitionDisplayConfig;
+	struct partition_tbl *m_partitionExternalTouchAFEConfig;
+	struct partition_tbl *m_partitionUtilityParameter;
+	struct partition_tbl *m_partitionFLD;
+	struct partition_tbl *m_partitionSBMB;
+	unsigned int m_partitionCount;
+	struct partition_tbl m_imgPartitions[MAX_PARTITION_ID];
 	unsigned char m_flashStatus;
 	unsigned char m_flashCmd;
 	unsigned char m_inBLmode;

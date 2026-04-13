@@ -1271,13 +1271,15 @@ int RMI4Update::WriteFirmwareV7()
 		else
 			transfer_leng = m_payloadLength;
 
-		// Set Transfer Length
-		trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
-		trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
+		if ((i == 0) || (transfer_leng == remain_block)) {
+			// Set Transfer Length
+			trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
+			trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
 
-		rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
-		if (rc != sizeof(trans_leng_buf))
+			rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
+			if (rc != sizeof(trans_leng_buf))
 			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		}
 
 		// Set Command to Write
 		cmd_buf[0] = (unsigned char)CMD_V7_WRITE;
@@ -1405,13 +1407,15 @@ int RMI4Update::WriteCoreConfigV7()
 		else
 			transfer_leng = m_payloadLength;
 
-		// Set Transfer Length
-		trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
-		trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
+		if ((i == 0) || (transfer_leng == remain_block)) {
+			// Set Transfer Length
+			trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
+			trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
 
-		rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
-		if (rc != sizeof(trans_leng_buf))
-			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+			rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
+			if (rc != sizeof(trans_leng_buf))
+				return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		}
 
 		// Set Command to Write
 		cmd_buf[0] = (unsigned char)CMD_V7_WRITE;
@@ -1535,13 +1539,15 @@ int RMI4Update::WriteFlashConfigV7()
 		else
 			transfer_leng = m_payloadLength;
 
-		// Set Transfer Length
-		trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
-		trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
+		if ((i == 0) || (transfer_leng == remain_block)) {
+			// Set Transfer Length
+			trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
+			trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
 
-		rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
-		if (rc != sizeof(trans_leng_buf))
-			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+			rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
+			if (rc != sizeof(trans_leng_buf))
+				return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		}
 
 		// Set Command to Write
 		cmd_buf[0] = (unsigned char)CMD_V7_WRITE;
@@ -1674,13 +1680,15 @@ int RMI4Update::WriteFLDV7()
 		else
 			transfer_leng = m_payloadLength;
 
-		// Set Transfer Length
-		trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
-		trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
+		if ((i == 0) || (transfer_leng == remain_block)) {
+			// Set Transfer Length
+			trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
+			trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
 
-		rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
-		if (rc != sizeof(trans_leng_buf))
-			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+			rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
+			if (rc != sizeof(trans_leng_buf))
+				return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		}
 
 		// Set Command to Write
 		cmd_buf[0] = (unsigned char)CMD_V7_WRITE;
@@ -1810,13 +1818,15 @@ int RMI4Update::WriteGlobalParametersV7()
 		else
 			transfer_leng = m_payloadLength;
 
-		// Set Transfer Length
-		trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
-		trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
+		if ((i == 0) || (transfer_leng == remain_block)) {
+			// Set Transfer Length
+			trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
+			trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
 
-		rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
-		if (rc != sizeof(trans_leng_buf))
-			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+			rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
+			if (rc != sizeof(trans_leng_buf))
+				return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		}
 
 		// Set Command to Write
 		cmd_buf[0] = (unsigned char)CMD_V7_WRITE;
@@ -1841,7 +1851,7 @@ int RMI4Update::WriteGlobalParametersV7()
 
 			data_temp = (unsigned char *) malloc(sizeof(unsigned char) * write_size);
 			if (data_temp != NULL) {
-				memcpy(data_temp, m_firmwareImage.GetFLDData() + offset, sizeof(char) * write_size);
+				memcpy(data_temp, m_firmwareImage.GetGlobalParametersData() + offset, sizeof(char) * write_size);
 				rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * write_size);
 				if (rc != ((ssize_t)sizeof(char) * write_size)) {
 					fprintf(stdout, "err write_size = %d; rc = %d\n", write_size, rc);
@@ -2567,13 +2577,15 @@ int RMI4Update::WriteSBLV10_1()
 		else
 			transfer_leng = m_payloadLength;
 
-		// Set Transfer Length
-		trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
-		trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
+		if ((i == 0) || (transfer_leng == remain_block)) {
+			// Set Transfer Length
+			trans_leng_buf[0] = (unsigned char)(transfer_leng & 0xFF);
+			trans_leng_buf[1] = (unsigned char)((transfer_leng & 0xFF00) >> 8);
 
-		rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
-		if (rc != sizeof(trans_leng_buf))
-			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+			rc = m_device.Write(dataAddr + 3, trans_leng_buf, sizeof(trans_leng_buf));
+			if (rc != sizeof(trans_leng_buf))
+				return UPDATE_FAIL_WRITE_FLASH_COMMAND;
+		}
 
 		// Set Command to Write
 		cmd_buf[0] = (unsigned char)CMD_V7_WRITE;

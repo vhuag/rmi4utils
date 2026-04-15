@@ -91,6 +91,14 @@ enum v7_flash_command {
 	CMD_V7_SIGNATURE,
 };
 
+/* Flags for WritePartitionV7 */
+enum WritePartitionFlags {
+	WPF_NONE               = 0,
+	WPF_SLEEP_BEFORE_WAIT  = (1 << 0),  /* Sleep 100ms before WaitForIdle on touchpad */
+	WPF_CHECK_WRITE_PROT   = (1 << 1),  /* Check WRITE_PROTECTION in poll loop (BL >= V8_7) */
+	WPF_WRITE_SIGNATURE    = (1 << 2),  /* Write signature after data transfer */
+};
+
 enum bl_version {
 	BL_V7Before = 50,
 	BL_V7 = 70,
@@ -223,6 +231,9 @@ private:
 	int WriteFlashConfigV7();
 	int WriteFLDV7();
 	int WriteGlobalParametersV7();
+	int WritePartitionV7(unsigned char partitionId, unsigned short blockCount,
+			const unsigned char *data, enum signature_BLv7 signatureIdx,
+			unsigned int flags);
 	int EnterFlashProgramming();
 	int WriteBlocks(unsigned char *block, unsigned short count, unsigned char cmd);
 	int WaitForIdle(int timeout_ms, bool readF34OnSucess = true);

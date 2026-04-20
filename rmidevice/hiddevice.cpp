@@ -448,7 +448,7 @@ int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
 	return totalBytesRead;
 }
 
-int HIDDevice::Write(unsigned short addr, const unsigned char *buf, unsigned short len)
+int HIDDevice::Write(unsigned short addr, const unsigned char *buf, unsigned short len, unsigned short longWriteLength)
 {
 	ssize_t count;
 
@@ -459,13 +459,16 @@ int HIDDevice::Write(unsigned short addr, const unsigned char *buf, unsigned sho
 	    HID_RMI4_WRITE_OUTPUT_DATA + len)
 		return -1;
 	m_outputReport[HID_RMI4_REPORT_ID] = RMI_WRITE_REPORT_ID;
-	m_outputReport[HID_RMI4_WRITE_OUTPUT_COUNT] = len;
+	m_outputReport[HID_RMI4_WRITE_OUTPUT_COUNT] = (longWriteLength != 0xFF) ? longWriteLength : len;
 	m_outputReport[HID_RMI4_WRITE_OUTPUT_ADDR] = addr & 0xFF;
 	m_outputReport[HID_RMI4_WRITE_OUTPUT_ADDR + 1] = (addr >> 8) & 0xFF;
 	memcpy(&m_outputReport[HID_RMI4_WRITE_OUTPUT_DATA], buf, len);
 
 	if (m_hasDebug) {
-		fprintf(stdout, "W %02x : ", addr);
+	//	fprintf(stdout, "W %02x : ", addr);
+		fprintf(stdout, "%02x ", m_outputReport[HID_RMI4_REPORT_ID]);
+		fprintf(stdout, "%02x ", m_outputReport[HID_RMI4_WRITE_OUTPUT_COUNT]);
+		fprintf(stdout, "%02x %02x ", m_outputReport[HID_RMI4_WRITE_OUTPUT_ADDR], m_outputReport[HID_RMI4_WRITE_OUTPUT_ADDR + 1]);
 		for (int i=0 ; i<len ; i++) {
 			fprintf(stdout, "%02x ", buf[i]);
 		}

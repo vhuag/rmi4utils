@@ -1250,7 +1250,6 @@ int RMI4Update::WritePartitionV7(
 	unsigned char *data_temp = NULL;
 	int rc;
 	unsigned short left_bytes;
-	unsigned short write_size;
 	unsigned short max_write_size;
 	unsigned short dataAddr = m_f34.GetDataBase();
 
@@ -1261,6 +1260,9 @@ int RMI4Update::WritePartitionV7(
 	/* calculate the count */
 	remain_block = (blockCount % m_payloadLength);
 	transaction_count = (blockCount / m_payloadLength);
+
+	fprintf(stdout, "WritePartitionV7: partitionId=0x%02X, blockCount=%d, transaction_count=%d, remain_block=%d\n",
+		partitionId, blockCount, transaction_count, remain_block);
 
 	if (remain_block > 0)
 		transaction_count++;
@@ -1297,34 +1299,62 @@ int RMI4Update::WritePartitionV7(
 		if (rc != sizeof(cmd_buf))
 			return UPDATE_FAIL_WRITE_FLASH_COMMAND;
 
-		max_write_size = 16;
-		if (max_write_size >= transfer_leng * m_blockSize)
-			max_write_size = transfer_leng * m_blockSize;
-		else if (max_write_size > m_blockSize)
-			max_write_size -= max_write_size % m_blockSize;
-		else
-			max_write_size = m_blockSize;
+		max_write_size = m_device.GetOutputReportSize() - 4;
 
-		left_bytes = transfer_leng * m_blockSize;
+		left_bytes = transfer_leng * m_blockSize ;
+
 		do {
-			if (left_bytes / max_write_size)
-				write_size = max_write_size;
-			else
-				write_size = left_bytes;
+			unsigned short LongWrite_ByteCount = m_payloadLength;
+			if (left_bytes < LongWrite_ByteCount)
+				LongWrite_ByteCount = left_bytes;
 
-			data_temp = (unsigned char *) malloc(sizeof(unsigned char) * write_size);
-			if (data_temp != NULL) {
-				memcpy(data_temp, data + offset, sizeof(char) * write_size);
-				rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * write_size);
-				if (rc != ((ssize_t)sizeof(char) * write_size)) {
-					fprintf(stdout, "err write_size = %d; rc = %d\n", write_size, rc);
-					return UPDATE_FAIL_READ_F34_QUERIES;
+			unsigned short long_left = LongWrite_ByteCount;
+			bool isFirstLongWrite = true;
+
+			while (long_left > 0) {
+				unsigned short chunk_size;
+				if (long_left / max_write_size)
+					chunk_size = max_write_size;
+				else
+					chunk_size = long_left;
+
+				data_temp = (unsigned char *) malloc(sizeof(unsigned char) * chunk_size);
+				if (data_temp != NULL) {
+					unsigned short actual_chunk = chunk_size;
+
+					if (isFirstLongWrite) {
+						if (left_bytes >= 255) {
+							// Prepend 2-byte LongWrite_ByteCount header, followed by data
+							data_temp[0] = (unsigned char)(LongWrite_ByteCount & 0xFF);
+							data_temp[1] = (unsigned char)((LongWrite_ByteCount >> 8) & 0xFF);
+							actual_chunk = chunk_size - 2;
+							memcpy(data_temp + 2, data + offset, sizeof(char) * actual_chunk);
+							rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * chunk_size, 0x0);
+						} else if (left_bytes >= 96) {
+							memcpy(data_temp + 2, data + offset, sizeof(char) * actual_chunk);
+							rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * chunk_size, left_bytes);
+						} else {
+							memcpy(data_temp, data + offset, sizeof(char) * actual_chunk);
+							rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * chunk_size);
+						}
+						isFirstLongWrite = false;
+					} else {
+						memcpy(data_temp, data + offset, sizeof(char) * chunk_size);
+						rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * chunk_size);
+					}
+
+					if (rc != ((ssize_t)sizeof(char) * chunk_size)) {
+						fprintf(stdout, "err write_size = %d; rc = %d\n", chunk_size, rc);
+						free(data_temp);
+						return UPDATE_FAIL_READ_F34_QUERIES;
+					}
+
+					offset += actual_chunk;
+					left_bytes -= actual_chunk;
+					long_left -= actual_chunk;
+					free(data_temp);
+					data_temp = NULL;
 				}
-
-				offset += write_size;
-				left_bytes -= write_size;
-				free(data_temp);
-				data_temp = NULL;
 			}
 		} while (left_bytes);
 
@@ -1901,7 +1931,6 @@ int RMI4Update::WriteSignatureV7(enum signature_BLv7 signature_partition, unsign
 	signature_info signature = m_firmwareImage.GetSignatureInfo()[signature_partition];
 	unsigned char trans_leng_buf[2];
 	unsigned short left_bytes;
-	unsigned short write_size;
 	unsigned short max_write_size;
 	unsigned char *data_temp = NULL;
 	int retry = 0;
@@ -1924,35 +1953,61 @@ int RMI4Update::WriteSignatureV7(enum signature_BLv7 signature_partition, unsign
 	if (rc != sizeof(cmd_buf))
 		return UPDATE_FAIL_WRITE_FLASH_COMMAND;
 
-	max_write_size = 16;
-	if (max_write_size >= transfer_leng * m_blockSize)
-		max_write_size = transfer_leng * m_blockSize;
-	else if (max_write_size > m_blockSize)
-		max_write_size -= max_write_size % m_blockSize;
-	else
-		max_write_size = m_blockSize;
-
+	max_write_size = m_device.GetOutputReportSize() - 4;
 	left_bytes = transfer_leng * m_blockSize;
 
 	do {
-		if (left_bytes / max_write_size)
-			write_size = max_write_size;
-		else
-			write_size = left_bytes;
+		unsigned short LongWrite_ByteCount = m_payloadLength;
+		if (left_bytes < LongWrite_ByteCount)
+			LongWrite_ByteCount = left_bytes;
 
-		data_temp = (unsigned char *) malloc(sizeof(unsigned char) * write_size);
-		if (data_temp != NULL) {
-			memcpy(data_temp, data + offset, sizeof(char) * write_size);
-			rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * write_size);
-			if (rc != ((ssize_t)sizeof(char) * write_size)) {
-				fprintf(stdout, "err write_size = %d; rc = %d\n", write_size, rc);
-				return UPDATE_FAIL_WRITE_BLOCK;
+		unsigned short long_left = LongWrite_ByteCount;
+		bool isFirstLongWrite = true;
+
+		while (long_left > 0) {
+			unsigned short chunk_size;
+			if (long_left / max_write_size)
+				chunk_size = max_write_size;
+			else
+				chunk_size = long_left;
+
+			data_temp = (unsigned char *) malloc(sizeof(unsigned char) * chunk_size);
+			if (data_temp != NULL) {
+				unsigned short actual_chunk = chunk_size;
+
+				if (isFirstLongWrite) {
+					if (left_bytes >= 255) {
+						// Prepend 2-byte LongWrite_ByteCount header, followed by data
+						data_temp[0] = (unsigned char)(LongWrite_ByteCount & 0xFF);
+						data_temp[1] = (unsigned char)((LongWrite_ByteCount >> 8) & 0xFF);
+						actual_chunk = chunk_size - 2;
+						memcpy(data_temp + 2, data + offset, sizeof(char) * actual_chunk);
+						rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * chunk_size, 0x0);
+					} else if (left_bytes >= 96) {
+						memcpy(data_temp + 2, data + offset, sizeof(char) * actual_chunk);
+						rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * chunk_size, left_bytes);
+					} else {
+						memcpy(data_temp, data + offset, sizeof(char) * actual_chunk);
+						rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * chunk_size);
+					}
+					isFirstLongWrite = false;
+				} else {
+					memcpy(data_temp, data + offset, sizeof(char) * chunk_size);
+					rc = m_device.Write(dataAddr + 5, data_temp, sizeof(char) * chunk_size);
+				}
+
+				if (rc != ((ssize_t)sizeof(char) * chunk_size)) {
+					fprintf(stdout, "err write_size = %d; rc = %d\n", chunk_size, rc);
+					free(data_temp);
+					return UPDATE_FAIL_READ_F34_QUERIES;
+				}
+
+				offset += actual_chunk;
+				left_bytes -= actual_chunk;
+				long_left -= actual_chunk;
+				free(data_temp);
+				data_temp = NULL;
 			}
-
-			offset += write_size;
-			left_bytes -= write_size;
-			free(data_temp);
-			data_temp = NULL;
 		}
 	} while (left_bytes);
 

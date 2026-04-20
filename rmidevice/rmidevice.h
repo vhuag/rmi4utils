@@ -44,7 +44,7 @@ public:
 	virtual int Read(unsigned short addr, unsigned char *data,
 				unsigned short len) = 0;
 	virtual int Write(unsigned short addr, const unsigned char *data,
-				 unsigned short len) = 0;
+				 unsigned short len, unsigned short longWriteLength = 0xFF) = 0;
 	virtual int SetMode(int mode) { return -1; /* Unsupported */ }
 	virtual int GetDesiredMode() const { return 0; }
 	virtual int ToggleInterruptMask(bool enable) = 0;
@@ -57,6 +57,7 @@ public:
 	virtual void Cancel() { m_bCancel = true; }
 	virtual void RebindDriver() = 0;
 	virtual bool CheckABSEvent() = 0;
+	virtual size_t GetOutputReportSize() { return 0; }
 
 	unsigned long GetFirmwareID() { return m_buildID; }
 	unsigned long GetConfigID() { return m_configID; }

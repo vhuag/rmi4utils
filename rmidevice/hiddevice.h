@@ -28,6 +28,7 @@ enum rmi_hid_mode_type {
 	HID_RMI4_MODE_MOUSE                     = 0,
 	HID_RMI4_MODE_ATTN_REPORTS              = 1,
 	HID_RMI4_MODE_NO_PACKED_ATTN_REPORTS    = 2,
+	HID_RMI4_MODE_IN_SYSTEM                 = 3,
 };
 
 class HIDDevice : public RMIDevice
@@ -39,7 +40,7 @@ public:
 		      m_outputReportSize(0),
 		      m_featureReportSize(0),
 		      m_deviceOpen(false),
-		      m_mode(HID_RMI4_MODE_ATTN_REPORTS),
+		      m_mode(HID_RMI4_MODE_IN_SYSTEM),
 		      m_initialMode(HID_RMI4_MODE_MOUSE),
 		      m_transportDeviceName(""),
 		      m_driverPath(""),
@@ -54,7 +55,7 @@ public:
 	virtual int Read(unsigned short addr, unsigned char *buf,
 				unsigned short len);
 	virtual int Write(unsigned short addr, const unsigned char *buf,
-				 unsigned short len);
+				 unsigned short len, unsigned short longWriteLength = 0xFF);
 	virtual int SetMode(int mode);
 	virtual int ToggleInterruptMask(bool enable);
 	virtual int WaitForAttention(struct timeval * timeout = NULL,
@@ -69,6 +70,9 @@ public:
 
 	virtual bool FindDevice(enum RMIDeviceType type = RMI_DEVICE_TYPE_ANY);
 	virtual bool CheckABSEvent();
+
+	virtual int GetDesiredMode() const { return (int)m_mode; }
+	virtual size_t GetOutputReportSize() { return m_outputReportSize; }	
 
 private:
 	int m_fd;

@@ -54,6 +54,7 @@ enum update_error {
 	UPDATE_FAIL_WRITE_PROTECTED,
 	UPDATE_FAIL_MSL_CHECKING,
 	UPDATE_FAIL_MEMORY_ALLOCATION,
+	UPDATE_FAIL_RMI_BACKDOOR_MODE,
 };
 
 const char * update_err_to_string(int err);

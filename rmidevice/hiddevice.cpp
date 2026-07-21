@@ -63,6 +63,36 @@ enum syna_hid_report_type {
 #define HID_RMI4_ATTN_DATA              2
 #define HID_RMI4_READREPORT_MAX_RETRY   10
 
+#define HID_DARFON_MAX_TRANSFER_BYTES   3
+#define HID_DARFON_CMD_HEADER_SIZE      4
+#define HID_DARFON_RESPONSE_LEN_INDEX   1
+#define HID_DARFON_RESPONSE_ACK_INDEX   2
+#define HID_DARFON_RESPONSE_DATA_INDEX  3
+#define HID_DARFON_WRITE_PREFIX         0x0A
+#define HID_DARFON_WRITE_COUNT          0x01
+#define HID_DARFON_ODM_REPORT_ID        0x02
+#define HID_DARFON_ODM_USAGE_PAGE       0xFF02
+
+#define HID_PS2_ACK                  0xFA
+#define HID_PS2_ERROR                0xFC
+#define HID_PS2_RESEND               0xFE
+#define HID_PS2_SET_SCALING_1_TO_1   0xE6
+#define HID_PS2_SET_SCALING_2_TO_1   0xE7
+#define HID_PS2_SET_RESOLUTION       0xE8
+#define HID_PS2_STATUS_REQUEST       0xE9
+#define HID_PS2_SET_SAMPLE_RATE      0xF3
+#define HID_PS2_ENABLE               0xF4
+#define HID_PS2_DISABLE              0xF5
+#define HID_PS2_FULL_RMI_BACKDOOR    0x7F
+#define HID_PS2_SET_MODE_BYTE_2      0x14
+#define HID_PS2_MAX_RESENDS          3
+#define HID_PS2_MAX_ACK_RETRIES      3
+
+
+/* Status Request argument to read the TouchPad capabilities. */
+#define HID_DARFON_ESR_READ_CAPABILITIES 0x02
+#define HID_DARFON_ESR_READ_EXTRA_CAPABILITIES2 0x0A
+
 #define SYNAPTICS_VENDOR_ID			0x06cb
 
 #if defined(__arm__) || defined(__aarch64__)
@@ -101,15 +131,65 @@ int HIDDevice::Open(const char * filename)
 	if (rc < 0)
 		goto error;
 
-	if (m_info.vendor != SYNAPTICS_VENDOR_ID) {
-		errno = -ENODEV;
-		rc = -1;
-		goto error;
-	}
+	fprintf(stdout, "HID device info: bus=0x%x, vendor=0x%x, product=0x%x\n",
+		m_info.bustype, m_info.vendor, m_info.product);
 
 	ParseReportDescriptor();
 
-	if (m_deviceType == RMI_DEVICE_TYPE_TOUCHPAD) 
+	if (m_hasDebug) {
+		fprintf(stdout,
+			"Descriptor summary: transport=%d, input=%zu, output=%zu, feature=%zu, DarfonODM=%s, DarfonReportID=0x%02x\n",
+			m_hidRMIType,
+			m_inputReportSize,
+			m_outputReportSize,
+			m_featureReportSize,
+			hasDarfonOdmFeatureReport ? "yes" : "no",
+			m_darfonFeatureReportId);
+	}
+
+
+	if (m_hidRMIType == HID_I2C_RMI) {
+		if (m_info.vendor != SYNAPTICS_VENDOR_ID) {
+			if (m_hasDebug) {
+				fprintf(stdout,
+					"Rejecting device: transport=%d requires Synaptics VID 0x%04x, got 0x%04x\n",
+					m_hidRMIType,
+					SYNAPTICS_VENDOR_ID,
+					m_info.vendor & 0xFFFF);
+			}
+			errno = ENODEV;
+			rc = -1;
+			goto error;
+		}
+	} else {
+		if (!hasDarfonOdmFeatureReport ||
+		    m_featureReportSize < HID_DARFON_CMD_HEADER_SIZE + 1) {
+			if (m_hasDebug) {
+				fprintf(stdout,
+					"Rejecting device: transport=%d expects UsagePage=0x%04x and ReportID=0x%02x with feature report size >= %d; detected DarfonODM=%s, feature=%zu\n",
+					m_hidRMIType,
+					HID_DARFON_ODM_USAGE_PAGE,
+					HID_DARFON_ODM_REPORT_ID,
+					HID_DARFON_CMD_HEADER_SIZE + 1,
+					hasDarfonOdmFeatureReport ? "yes" : "no",
+					m_featureReportSize);
+			}
+			errno = ENODEV;
+			rc = -1;
+			goto error;
+		}
+
+		if (m_hasDebug) {
+			fprintf(stdout,
+				"Accepting transport %d using ODM descriptor detection: usage page 0x%x, report ID 0x%x\n",
+				m_hidRMIType,
+				HID_DARFON_ODM_USAGE_PAGE,
+				m_darfonFeatureReportId);
+		}
+	}
+
+	if (m_hidRMIType == HID_I2C_RMI &&
+	    m_deviceType == RMI_DEVICE_TYPE_TOUCHPAD)
 	{
 		if (!(hasVendorDefineWriteReportID &&
 			hasVendorDefineReadAddrReportID &&
@@ -127,32 +207,49 @@ int HIDDevice::Open(const char * filename)
 		}
 	}
 
-	m_inputReport = new unsigned char[m_inputReportSize]();
-	if (!m_inputReport) {
-		errno = -ENOMEM;
-		rc = -1;
-		goto error;
+	if (m_inputReportSize) {
+		m_inputReport = new unsigned char[m_inputReportSize]();
+		if (!m_inputReport) {
+			errno = -ENOMEM;
+			rc = -1;
+			goto error;
+		}
 	}
 
-	m_outputReport = new unsigned char[m_outputReportSize]();
-	if (!m_outputReport) {
-		errno = -ENOMEM;
-		rc = -1;
-		goto error;
+	if (m_outputReportSize) {
+		m_outputReport = new unsigned char[m_outputReportSize]();
+		if (!m_outputReport) {
+			errno = -ENOMEM;
+			rc = -1;
+			goto error;
+		}
 	}
 
-	m_readData = new unsigned char[m_inputReportSize]();
-	if (!m_readData) {
-		errno = -ENOMEM;
-		rc = -1;
-		goto error;
+	if (m_inputReportSize) {
+		m_readData = new unsigned char[m_inputReportSize]();
+		if (!m_readData) {
+			errno = -ENOMEM;
+			rc = -1;
+			goto error;
+		}
 	}
 
-	m_attnData = new unsigned char[m_inputReportSize]();
-	if (!m_attnData) {
-		errno = -ENOMEM;
-		rc = -1;
-		goto error;
+	if (m_inputReportSize) {
+		m_attnData = new unsigned char[m_inputReportSize]();
+		if (!m_attnData) {
+			errno = -ENOMEM;
+			rc = -1;
+			goto error;
+		}
+	}
+
+	if (m_featureReportSize) {
+		m_featureReport = new unsigned char[m_featureReportSize]();
+		if (!m_featureReport) {
+			errno = -ENOMEM;
+			rc = -1;
+			goto error;
+		}
 	}
 
 	m_deviceOpen = true;
@@ -166,7 +263,7 @@ int HIDDevice::Open(const char * filename)
 		}
 	}
 
-	if (m_initialMode != m_mode) {
+	if (m_hidRMIType == HID_I2C_RMI && m_initialMode != m_mode) {
 		rc = SetMode(m_mode);
 		if (rc) {
 			rc = -1;
@@ -188,11 +285,45 @@ void HIDDevice::ParseReportDescriptor()
 	int totalReportSize = 0;
 	int reportSize = 0;
 	int reportCount = 0;
+	unsigned short currentUsagePage = 0;
 	enum syna_hid_report_type hidReportType = SYNA_HID_REPORT_TYPE_UNKNOWN;
 	bool inCollection = false;
 
+	m_inputReportSize = 0;
+	m_outputReportSize = 0;
+	m_featureReportSize = 0;
+	hasVendorDefineLIDMode = false;
+	hasVendorDefineWriteReportID = false;
+	hasVendorDefineReadAddrReportID = false;
+	hasVendorDefineReadDataReportID = false;
+	hasVendorDefineAttentionReportID = false;
+	hasVendorDefineRMIModeReportID = false;
+	hasDarfonOdmFeatureReport = false;
+
 	for (unsigned int i = 0; i < m_rptDesc.size; ++i) {
 		if (m_rptDesc.value[i] == 0xc0) {
+			// Finish up the size of the last report in this collection,
+			// since otherwise it is only finalized when the next report ID
+			// (0x85) is encountered.
+			if (isVendorSpecific && isReport) {
+				totalReportSize = (reportSize * reportCount) >> 3;
+
+				switch (hidReportType) {
+					case SYNA_HID_REPORT_TYPE_INPUT:
+						m_inputReportSize = totalReportSize + 1;
+						break;
+					case SYNA_HID_REPORT_TYPE_OUTPUT:
+						m_outputReportSize = totalReportSize + 1;
+						break;
+					case SYNA_HID_REPORT_TYPE_FEATURE:
+						m_featureReportSize = totalReportSize + 1;
+						break;
+					case SYNA_HID_REPORT_TYPE_UNKNOWN:
+					default:
+						break;
+				}
+			}
+
 			inCollection = false;
 			isVendorSpecific = false;
 			isReport = false;
@@ -201,6 +332,16 @@ void HIDDevice::ParseReportDescriptor()
 
 		if (isVendorSpecific) {
 			if (m_rptDesc.value[i] == 0x85) {
+				if (i + 1 >= m_rptDesc.size)
+					return;
+
+				if (m_hasDebug) {
+					fprintf(stdout,
+						"Descriptor scan: vendor usage page 0x%04x report ID 0x%02x\n",
+						currentUsagePage,
+						m_rptDesc.value[i + 1]);
+				}
+
 				if (isReport) {
 					// finish up data on the previous report
 					totalReportSize = (reportSize * reportCount) >> 3;
@@ -226,6 +367,18 @@ void HIDDevice::ParseReportDescriptor()
 				reportSize = 0;
 				reportCount = 0;
 				hidReportType = SYNA_HID_REPORT_TYPE_UNKNOWN;
+
+				if (currentUsagePage == HID_DARFON_ODM_USAGE_PAGE &&
+				    m_rptDesc.value[i + 1] == HID_DARFON_ODM_REPORT_ID) {
+					hasDarfonOdmFeatureReport = true;
+					m_darfonFeatureReportId = HID_DARFON_ODM_REPORT_ID;
+					if (m_hasDebug) {
+						fprintf(stdout,
+							"Descriptor match: found Darfon ODM usage page 0x%04x with report ID 0x%02x\n",
+							currentUsagePage,
+							m_darfonFeatureReportId);
+					}
+				}
 
 				isReport = true;
 			}
@@ -324,7 +477,17 @@ void HIDDevice::ParseReportDescriptor()
 					if (i + 2 >= m_rptDesc.size)
 						break;
 
-					if (m_rptDesc.value[i + 1] == 0x00 && m_rptDesc.value[i + 2] == 0xFF)
+					currentUsagePage = m_rptDesc.value[i + 1] |
+						(m_rptDesc.value[i + 2] << 8);
+
+					if (m_hasDebug) {
+						fprintf(stdout,
+							"Descriptor scan: usage page 0x%04x\n",
+							currentUsagePage);
+					}
+
+					if (currentUsagePage == 0xFF00 ||
+					    currentUsagePage == HID_DARFON_ODM_USAGE_PAGE)
 						isVendorSpecific = true;
 					i += 2;
 					break;
@@ -337,6 +500,23 @@ void HIDDevice::ParseReportDescriptor()
 }
 
 int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
+
+{
+	if (m_hidRMIType == HID_PS2_RMI)
+		return ReadHIDPS2RMI(addr, buf, len);
+
+	return ReadHIDI2CRMI(addr, buf, len);
+}
+
+int HIDDevice::EnsureRMIBackdoorMode(bool force)
+{
+	if (m_hidRMIType != HID_PS2_RMI)
+		return 0;
+
+	return EnterRMIBackdoor(force);
+}
+
+int HIDDevice::ReadHIDI2CRMI(unsigned short addr, unsigned char *buf, unsigned short len)
 {
 	ssize_t count;
 	size_t bytesReadPerRequest;
@@ -448,6 +628,15 @@ int HIDDevice::Read(unsigned short addr, unsigned char *buf, unsigned short len)
 }
 
 int HIDDevice::Write(unsigned short addr, const unsigned char *buf, unsigned short len)
+
+{
+	if (m_hidRMIType == HID_PS2_RMI)
+		return WriteHIDPS2RMI(addr, buf, len);
+
+	return WriteHIDI2CRMI(addr, buf, len);
+}
+
+int HIDDevice::WriteHIDI2CRMI(unsigned short addr, const unsigned char *buf, unsigned short len)
 {
 	ssize_t count;
 
@@ -482,6 +671,501 @@ int HIDDevice::Write(unsigned short addr, const unsigned char *buf, unsigned sho
 		}
 		return len;
 	}
+}
+
+int HIDDevice::EnterRMIBackdoor(bool bForce)
+{
+	if (m_hidRMIType == HID_I2C_RMI)
+		return 0;
+
+	if (m_backdoorEnabled && !bForce)
+		return 0;
+
+	fprintf(stdout, "Enabling RMI backdoor mode\n");
+	if (!m_featureReport || m_featureReportSize < HID_DARFON_CMD_HEADER_SIZE + 1) {
+		errno = ENOTSUP;
+		if (m_hasDebug) {
+			fprintf(stderr,
+				"%s: TPRMI transport requires a feature report buffer of at least %d bytes\n",
+				__func__, HID_DARFON_CMD_HEADER_SIZE + 1);
+		}
+		return -1;
+	}
+
+	if (PutDeviceBytePolled(HID_PS2_DISABLE) < 0)
+		return -1;
+
+	if (SampleRateSequence(HID_PS2_SET_MODE_BYTE_2,
+			       HID_PS2_FULL_RMI_BACKDOOR) < 0) {
+		if (m_hasDebug) {
+			fprintf(stderr, "%s: failed to enter PS2 RMI backdoor\n", __func__);
+		}
+		return -1;
+	}
+
+	m_backdoorEnabled = true;
+	return 0;
+}
+
+int HIDDevice::SetFeatureReport(unsigned char reportId, const unsigned char *data,
+				       size_t dataLen)
+{
+	ssize_t rc;
+
+	if (!m_deviceOpen || !m_featureReport || dataLen + 1 > m_featureReportSize) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	memset(m_featureReport, 0, m_featureReportSize);
+	m_featureReport[0] = reportId;
+	if (dataLen)
+		memcpy(m_featureReport + 1, data, dataLen);
+
+	for (;;) {
+		m_bCancel = false;
+		rc = ioctl(m_fd, HIDIOCSFEATURE(m_featureReportSize), m_featureReport);
+		if (rc < 0) {
+			if (errno == EINTR && m_deviceOpen && !m_bCancel)
+				continue;
+			return -1;
+		}
+		return 0;
+	}
+}
+
+int HIDDevice::GetFeatureReport(unsigned char reportId)
+{
+	ssize_t rc;
+
+	if (!m_deviceOpen || !m_featureReport || !m_featureReportSize) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	memset(m_featureReport, 0, m_featureReportSize);
+	m_featureReport[0] = reportId;
+
+	for (;;) {
+		m_bCancel = false;
+		rc = ioctl(m_fd, HIDIOCGFEATURE(m_featureReportSize), m_featureReport);
+		if (rc < 0) {
+			if (errno == EINTR && m_deviceOpen && !m_bCancel)
+				continue;
+			return -1;
+		}
+		return 0;
+	}
+}
+
+int HIDDevice::WaitForDarfonAck()
+{
+	unsigned char data[HID_DARFON_MAX_TRANSFER_BYTES] = {0};
+	size_t dataLen = 0;
+
+	for (int retry = 0; retry < HID_PS2_MAX_ACK_RETRIES; ++retry) {
+		if (GetFeatureReport(m_darfonFeatureReportId) < 0)
+			return -1;
+
+		if (m_featureReportSize <= HID_DARFON_RESPONSE_ACK_INDEX + 1) {
+			errno = EPROTO;
+			return -1;
+		}
+
+		dataLen = 0;
+		if (ReadDarfonData(data, &dataLen) < 0)
+			return -1;
+
+		if (dataLen == 0)
+			return m_featureReport[HID_DARFON_RESPONSE_ACK_INDEX + 1];
+		if (m_featureReport[HID_DARFON_RESPONSE_ACK_INDEX + 1] == HID_PS2_ACK)
+			return HID_PS2_ACK;
+		if (m_featureReport[HID_DARFON_RESPONSE_ACK_INDEX + 1] == HID_PS2_RESEND)
+			return HID_PS2_RESEND;
+		if (m_featureReport[HID_DARFON_RESPONSE_ACK_INDEX + 1] == HID_PS2_ERROR)
+			return HID_PS2_RESEND;
+	}
+
+	errno = ETIMEDOUT;
+	return -1;
+}
+
+int HIDDevice::PutDeviceBytesPolled(const unsigned char *values, size_t valueCount,
+				          unsigned int responseBytes)
+{
+	std::vector<unsigned char> command;
+	int ack;
+
+	if (!values || valueCount == 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/*
+	 * Protocol payload after the report ID is:
+	 *   0x0A LengthT LengthR DataT1 ... DataTN
+	 */
+	command.resize((HID_DARFON_CMD_HEADER_SIZE - 1) + valueCount);
+	command[0] = HID_DARFON_WRITE_PREFIX;
+	command[1] = static_cast<unsigned char>(valueCount);
+	command[2] = static_cast<unsigned char>(responseBytes);
+	memcpy(&command[3], values, valueCount);
+/*
+	fprintf(stdout, "Darfon command: ");
+	for (size_t i = 0; i < command.size(); ++i)
+		fprintf(stdout, "0x%02x ", command[i]);
+	fprintf(stdout, "\n");*/
+
+	for (int resend = 0; resend < HID_PS2_MAX_RESENDS; ++resend) {
+		if (SetFeatureReport(m_darfonFeatureReportId, command.data(), command.size()) < 0)
+			return -1;
+
+		Sleep(10);
+
+		if (responseBytes != 1) {
+			/*
+			 * Match the Windows implementation: when more than one byte is
+			 * expected, the ACK is consumed together with the payload by the
+			 * subsequent read path, so there is nothing to wait for here.
+			 */
+			return 0;
+		}
+
+		ack = WaitForDarfonAck();
+		if (ack == HID_PS2_ACK)
+			return 0;
+		if (ack == HID_PS2_RESEND)
+			continue;
+
+		if (m_hasDebug)
+			fprintf(stdout, "No ACK response for 0x%02x, skip\n", values[0]);
+
+		return 0;
+	}
+
+	return 0;
+}
+
+int HIDDevice::PutDeviceBytePolled(unsigned char value, unsigned int responseBytes)
+{
+	return PutDeviceBytesPolled(&value, 1, responseBytes);
+}
+
+int HIDDevice::ReadDarfonData(unsigned char *data, size_t *dataLen)
+{
+	unsigned char payloadLen;
+	unsigned char ack;
+
+	if (!data || !dataLen || !m_featureReport || m_featureReportSize <= 1) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (m_featureReportSize <= HID_DARFON_RESPONSE_DATA_INDEX + 1) {
+		errno = EPROTO;
+		return -1;
+	}
+
+	payloadLen = m_featureReport[HID_DARFON_RESPONSE_LEN_INDEX + 1];
+	ack = m_featureReport[HID_DARFON_RESPONSE_ACK_INDEX + 1];
+	if (payloadLen == 0) {
+		errno = EPROTO;
+		return -1;
+	}
+
+	if (payloadLen > 0)
+		payloadLen -= 1;
+
+	if (payloadLen > HID_DARFON_MAX_TRANSFER_BYTES)
+		payloadLen = HID_DARFON_MAX_TRANSFER_BYTES;
+
+	*dataLen = payloadLen;
+	if (payloadLen == 0)
+		return 0;
+
+	if (ack != HID_PS2_ACK) {
+		errno = EPROTO;
+		return -1;
+	}
+
+	if (static_cast<size_t>(HID_DARFON_RESPONSE_DATA_INDEX + 1 + payloadLen) >
+	    m_featureReportSize) {
+		errno = EPROTO;
+		return -1;
+	}
+
+	memcpy(data, m_featureReport + HID_DARFON_RESPONSE_DATA_INDEX + 1, payloadLen);
+	return 0;
+}
+
+int HIDDevice::SetResolutionSequence(unsigned char value)
+{
+	if (PutDeviceBytePolled(HID_PS2_SET_SCALING_1_TO_1) < 0)
+		return -1;
+	if (PutDeviceBytePolled(HID_PS2_SET_SCALING_1_TO_1) < 0)
+		return -1;
+
+	for (int index = 3; index >= 0; --index) {
+		int shift = index * 2;
+		if (PutDeviceBytePolled(HID_PS2_SET_RESOLUTION) < 0)
+			return -1;
+		if (PutDeviceBytePolled((value >> shift) & 0x03) < 0)
+			return -1;
+	}
+
+	return 0;
+}
+
+int HIDDevice::SampleRateSequence(unsigned char sequence, unsigned char value)
+{
+	for (int retry = 0; retry < HID_PS2_MAX_RESENDS; ++retry) {
+		if (SetResolutionSequence(value) == 0 &&
+		    PutDeviceBytePolled(HID_PS2_SET_SAMPLE_RATE) == 0 &&
+		    PutDeviceBytePolled(sequence) == 0)
+			return 0;
+	}
+
+	errno = EPROTO;
+	return -1;
+}
+
+/*
+ * Execute a TouchPad Status Request sequence: send the 8-bit argument down
+ * two bits at a time via SetResolution, issue a Status Request (0xE9) and read
+ * back the three-byte response packed into *response as (b0<<16)|(b1<<8)|b2.
+ */
+int HIDDevice::StatusRequestSequence(unsigned char argument, unsigned long *response)
+{
+	unsigned char readBuffer[HID_DARFON_MAX_TRANSFER_BYTES];
+	size_t dataLen = 0;
+
+	if (!m_deviceOpen)
+		return -1;
+
+	if (!response) {
+		errno = EINVAL;
+		return -1;
+	}
+
+//	if (EnsureRMIBackdoor() < 0)
+//		return -1;
+
+	if (SetResolutionSequence(argument) < 0)
+		return -1;
+
+	if (PutDeviceBytePolled(HID_PS2_STATUS_REQUEST,
+				HID_DARFON_MAX_TRANSFER_BYTES + 1) < 0)
+		return -1;
+
+	if (GetFeatureReport(m_darfonFeatureReportId) < 0)
+		return -1;
+
+	if (ReadDarfonData(readBuffer, &dataLen) < 0)
+		return -1;
+
+	if (dataLen < HID_DARFON_MAX_TRANSFER_BYTES) {
+		errno = EPROTO;
+		return -1;
+	}
+
+	*response = (static_cast<unsigned long>(readBuffer[0]) << 16)
+		  | (static_cast<unsigned long>(readBuffer[1]) << 8)
+		  | static_cast<unsigned long>(readBuffer[2]);
+
+	if (m_hasDebug)
+		fprintf(stdout, "Status request 0x%02x (Darfon TPRMI): %06lx\n",
+			argument, *response);
+
+	return 0;
+}
+
+/*
+ * Read the board sub-number from the TouchPad capabilities. The board
+ * sub-number is the middle byte of the 3-byte Status Request response.
+ */
+int HIDDevice::GetBoardSubID(unsigned char *boardSubID)
+{
+	unsigned long response = 0;
+
+	if (!boardSubID) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (m_hidRMIType != HID_PS2_RMI) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	if (StatusRequestSequence(HID_DARFON_ESR_READ_CAPABILITIES, &response) < 0)
+		return -1;
+
+	*boardSubID = static_cast<unsigned char>((response >> 8) & 0xFF);
+	return 0;
+}
+
+int HIDDevice::GetPackratID(unsigned long *packratID)
+{
+	unsigned long response = 0;
+
+	if (!packratID) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (m_hidRMIType != HID_PS2_RMI) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	if (StatusRequestSequence(HID_DARFON_ESR_READ_EXTRA_CAPABILITIES2, &response) < 0)
+		return -1;
+
+	*packratID = response;
+
+	return 0;
+}
+
+int HIDDevice::ReadHIDPS2RMI(unsigned short addr, unsigned char *buf, unsigned short len)
+{
+	int commandSent;
+	size_t bytesRead;
+	unsigned char readBuffer[HID_DARFON_MAX_TRANSFER_BYTES];
+	size_t dataLen;
+	unsigned short totalRead = 0;
+
+	if (!m_deviceOpen)
+		return -1;
+
+	if (addr > 0xFF) {
+		errno = EINVAL;
+		if (m_hasDebug) {
+			fprintf(stderr,
+				"%s: Darfon TPRMI fallback only supports 8-bit addresses, got 0x%04x\n",
+				__func__, addr);
+		}
+		return -1;
+	}
+
+	if (!buf && len) {
+		errno = EINVAL;
+		return -1;
+	}
+
+//	if (EnsureRMIBackdoor() < 0)
+//		return -1;
+
+	commandSent = PutDeviceBytePolled(HID_PS2_SET_SCALING_2_TO_1);
+	if (commandSent < 0)
+		return -1;
+	commandSent = PutDeviceBytePolled(HID_PS2_SET_SAMPLE_RATE);
+	if (commandSent < 0)
+		return -1;
+	commandSent = PutDeviceBytePolled(static_cast<unsigned char>(addr));
+	if (commandSent < 0)
+		return -1;
+
+	while (totalRead < len) {
+		commandSent = PutDeviceBytePolled(HID_PS2_STATUS_REQUEST,
+						 HID_DARFON_MAX_TRANSFER_BYTES + 1);
+		if (commandSent < 0)
+			return -1;
+
+		if (GetFeatureReport(m_darfonFeatureReportId) < 0)
+			return -1;
+		dataLen = 0;
+		if (ReadDarfonData(readBuffer, &dataLen) < 0)
+			return -1;
+		if (dataLen == 0) {
+			errno = EPROTO;
+			return -1;
+		}
+/*
+		if (m_hasDebug) {
+			fprintf(stdout,
+				"ReadDarfonTPRMI chunk %02x (Darfon TPRMI): ", addr);
+			for (size_t index = 0; index < dataLen; ++index)
+				fprintf(stdout, "%02x ", readBuffer[index]);
+			fprintf(stdout, "(len=%zu)\n", dataLen);
+		}*/
+
+		bytesRead = len - totalRead;
+		if (bytesRead > dataLen)
+			bytesRead = dataLen;
+		memcpy(buf + totalRead, readBuffer, bytesRead);
+		totalRead += bytesRead;
+	}
+
+	if (m_hasDebug) {
+		fprintf(stdout, "R %02x (Darfon TPRMI): ", addr);
+		for (int index = 0; index < len; ++index)
+			fprintf(stdout, "%02x ", buf[index]);
+		fprintf(stdout, "\n");
+	}
+
+	return totalRead;
+}
+
+int HIDDevice::WriteHIDPS2RMI(unsigned short addr, const unsigned char *buf, unsigned short len)
+{
+	int commandSent;
+
+	if (!m_deviceOpen)
+		return -1;
+
+	if (addr > 0xFF) {
+		errno = EINVAL;
+		if (m_hasDebug) {
+			fprintf(stderr,
+				"%s: Darfon TPRMI fallback only supports 8-bit addresses, got 0x%04x\n",
+				__func__, addr);
+		}
+		return -1;
+	}
+
+	if (!buf && len) {
+		errno = EINVAL;
+		return -1;
+	}
+
+//	if (EnsureRMIBackdoor() < 0)
+//		return -1;
+
+	for (int retry = 0; retry < HID_PS2_MAX_RESENDS; ++retry) {
+		commandSent = PutDeviceBytePolled(HID_PS2_SET_SCALING_2_TO_1);
+		if (commandSent < 0) {
+			Sleep(1);
+			continue;
+		}
+		commandSent = PutDeviceBytePolled(HID_PS2_SET_SAMPLE_RATE);
+		if (commandSent < 0) {
+			Sleep(1);
+			continue;
+		}
+		commandSent = PutDeviceBytePolled(static_cast<unsigned char>(addr));
+		if (commandSent < 0) {
+			Sleep(1);
+			continue;
+		}
+
+		for (unsigned short index = 0; index < len; ++index) {
+			if (PutDeviceBytePolled(HID_PS2_SET_SAMPLE_RATE) < 0)
+				return -1;
+			if (PutDeviceBytePolled(buf[index]) < 0)
+				return -1;
+		}
+
+		if (m_hasDebug) {
+			fprintf(stdout, "W %02x (Darfon TPRMI): ", addr);
+			for (int index = 0; index < len; ++index)
+				fprintf(stdout, "%02x ", buf[index]);
+			fprintf(stdout, "\n");
+		}
+		return len;
+	}
+
+	errno = EIO;
+	return -1;
 }
 
 int HIDDevice::SetMode(int mode)
@@ -548,7 +1232,7 @@ void HIDDevice::Close()
 	if (!m_deviceOpen)
 		return;
 
-	if (m_initialMode != m_mode)
+	if (m_hidRMIType == HID_I2C_RMI && m_initialMode != m_mode)
 		SetMode(m_initialMode);
 
 	m_deviceOpen = false;
@@ -563,6 +1247,9 @@ void HIDDevice::Close()
 	m_readData = NULL;
 	delete[] m_attnData;
 	m_attnData = NULL;
+	delete[] m_featureReport;
+	m_featureReport = NULL;
+	m_backdoorEnabled = false;
 }
 
 int HIDDevice::WaitForAttention(struct timeval * timeout, unsigned int source_mask)

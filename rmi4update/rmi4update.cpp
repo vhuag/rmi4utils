@@ -55,6 +55,7 @@
 #define RMI_F34_ERASE_ALL             0x03
 #define RMI_F34_WRITE_LOCKDOWN_BLOCK  0x04
 #define RMI_F34_WRITE_CONFIG_BLOCK    0x06
+#define RMI_F34_WRITE_SIGNATURE       0x0b
 #define RMI_F34_ENABLE_FLASH_PROG     0x0f
 
 #define RMI_F34_ENABLE_WAIT_MS 300
@@ -382,6 +383,7 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 		
 		
 	} else {
+		fprintf(stdout, "Enable Flash V5+...\n");
 		rc = EnterFlashProgramming();
 		if (rc != UPDATE_SUCCESS) {
 			fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
@@ -427,6 +429,19 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 		goto reset;
 	}
 
+	if (!IsHIDRMIType(HID_I2C_RMI)) {
+		Sleep(5000);
+
+		rc = m_device.EnsureRMIBackdoorMode(true);
+		if (rc < 0) {
+			fprintf(stderr, "%s: failed to restore transport after erase\n", __func__);
+			rc = UPDATE_FAIL_RMI_BACKDOOR_MODE;
+			goto reset;
+		}
+	}
+
+	
+
 	rc = WaitForIdle(RMI_F34_ERASE_WAIT_MS);
 	if (rc != UPDATE_SUCCESS) {
 		fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
@@ -434,20 +449,28 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 	}
 	clock_gettime(CLOCK_MONOTONIC, &end);
 	duration_us = diff_time(&start, &end);
-	fprintf(stdout, "Erase complete, time: %lld us.\n", duration_us);
+	fprintf(stdout, "Erase complete, time: %.3f ms.\n", duration_us / 1000.0);
 
 	if (m_firmwareImage.GetFirmwareData()) {
 		fprintf(stdout, "Writing firmware...\n");
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		rc = WriteBlocks(m_firmwareImage.GetFirmwareData(), m_fwBlockCount,
-						RMI_F34_WRITE_FW_BLOCK);
+						RMI_F34_WRITE_FW_BLOCK, true);
 		if (rc != UPDATE_SUCCESS) {
 			fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
 			goto reset;
 		}
 		clock_gettime(CLOCK_MONOTONIC, &end);
 		duration_us = diff_time(&start, &end);
-		fprintf(stdout, "Done writing FW, time: %lld us.\n", duration_us);
+		if (!IsHIDRMIType(HID_I2C_RMI)) {
+			long long duration_sec = duration_us / 1000000;
+			long long duration_min = duration_sec / 60;
+			long long duration_rem_sec = duration_sec % 60;
+			fprintf(stdout, "Done writing FW, time: %lld us. (%02lld minutes, %02lld seconds)\n",
+				duration_us, duration_min, duration_rem_sec);
+		} else {
+			fprintf(stdout, "Done writing FW, time: %lld us.\n", duration_us);
+		}
 	}
 
 	if (m_firmwareImage.GetConfigData()) {
@@ -461,7 +484,15 @@ int RMI4Update::UpdateFirmware(bool force, bool performLockdown)
 		}
 		clock_gettime(CLOCK_MONOTONIC, &end);
 		duration_us = diff_time(&start, &end);
-		fprintf(stdout, "Done writing config, time: %lld us.\n", duration_us);
+		if (!IsHIDRMIType(HID_I2C_RMI)) {
+			long long duration_sec = duration_us / 1000000;
+			long long duration_min = duration_sec / 60;
+			long long duration_rem_sec = duration_sec % 60;
+			fprintf(stdout, "Done writing config, time: %lld us. (%02lld minutes, %02lld seconds)\n",
+				duration_us, duration_min, duration_rem_sec);
+		} else {
+			fprintf(stdout, "Done writing config, time: %lld us.\n", duration_us);
+		}
 	}
 
 reset:
@@ -470,10 +501,20 @@ rebind:
 	if (GetDeviceBootloaderVersion() >= BL_V10) {
 		Sleep(5000);
 	}
-	m_device.RebindDriver();
-	if(!m_device.CheckABSEvent())
-	{
-		goto rebind;
+
+	if (IsHIDRMIType(HID_I2C_RMI)) {
+		m_device.RebindDriver();
+		if(!m_device.CheckABSEvent())
+		{
+			goto rebind;
+		}
+	} else {
+		rc = m_device.EnsureRMIBackdoorMode(true);
+		if (rc < 0) {
+			fprintf(stderr, "%s: failed to back to RMIBackdoor mode after reset\n", __func__);
+			rc = UPDATE_FAIL_RMI_BACKDOOR_MODE;
+			return rc;
+		}
 	}
 
 	// In order to print out new PR
@@ -820,6 +861,16 @@ int RMI4Update::ReadF34Queries()
 		querySize = 8;
 	else
 		querySize = 2;
+
+	if (IsHIDRMIType(HID_PS2_RMI)) {
+		rc = m_device.EnsureRMIBackdoorMode(true);
+		if (rc < 0) {
+			fprintf(stderr, "%s: %s\n", __func__, update_err_to_string(rc));
+			rc = UPDATE_FAIL_RMI_BACKDOOR_MODE;
+			return rc;
+		}
+			
+	}
 
 	rc = m_device.Read(queryAddr, m_bootloaderID, RMI_BOOTLOADER_ID_SIZE);
 	if (rc != RMI_BOOTLOADER_ID_SIZE)
@@ -1942,11 +1993,11 @@ int RMI4Update::EnterFlashProgramming()
 	} else {
 		// For TouchPad
 		rc = WaitForIdle(RMI_F34_ENABLE_WAIT_MS);
-		if (rc != UPDATE_SUCCESS)
+		if (rc != UPDATE_SUCCESS && !IsHIDRMIType(HID_PS2_RMI))
 			return UPDATE_FAIL_NOT_IN_IDLE_STATE;
 	}
 
-	if (!m_programEnabled)
+	if (!m_programEnabled && !IsHIDRMIType(HID_PS2_RMI))
 		return UPDATE_FAIL_PROGRAMMING_NOT_ENABLED;
 
 	fprintf(stdout, "Programming is enabled.\n");
@@ -1972,21 +2023,22 @@ int RMI4Update::EnterFlashProgramming()
 	if (rc != UPDATE_SUCCESS)
 		return rc;
 
-	rc = m_device.Read(m_f01.GetControlBase(), &f01Control_0, 1);
-	if (rc != 1)
-		return UPDATE_FAIL_READ_F01_CONTROL_0;
+	if (!IsHIDRMIType(HID_PS2_RMI)) {
+		rc = m_device.Read(m_f01.GetControlBase(), &f01Control_0, 1);
+		if (rc != 1)
+			return UPDATE_FAIL_READ_F01_CONTROL_0;
 
-	f01Control_0 |= RMI_F01_CRTL0_NOSLEEP_BIT;
-	f01Control_0 = (f01Control_0 & ~RMI_F01_CTRL0_SLEEP_MODE_MASK) | RMI_SLEEP_MODE_NORMAL;
+		f01Control_0 |= RMI_F01_CRTL0_NOSLEEP_BIT;
+		f01Control_0 = (f01Control_0 & ~RMI_F01_CTRL0_SLEEP_MODE_MASK) | RMI_SLEEP_MODE_NORMAL;
 
-	rc = m_device.Write(m_f01.GetControlBase(), &f01Control_0, 1);
-	if (rc != 1)
-		return UPDATE_FAIL_WRITE_F01_CONTROL_0;
-
+		rc = m_device.Write(m_f01.GetControlBase(), &f01Control_0, 1);
+		if (rc != 1)
+			return UPDATE_FAIL_WRITE_F01_CONTROL_0;
+	}
 	return UPDATE_SUCCESS;
 }
 
-int RMI4Update::WriteBlocks(unsigned char *block, unsigned short count, unsigned char cmd)
+int RMI4Update::WriteBlocks(unsigned char *block, unsigned short count, unsigned char cmd, bool needWriteSignature)
 {
 	int blockNum;
 	unsigned char zeros[] = { 0, 0 };
@@ -2035,6 +2087,29 @@ int RMI4Update::WriteBlocks(unsigned char *block, unsigned short count, unsigned
 
 		block += m_blockSize;
 	}
+
+	if(needWriteSignature && m_firmwareImage.HasSecureUpdate()){
+		fprintf(stderr, "Writing Signature...\n");
+		fprintf(stdout, "Write Signature...\n");
+		cmd = RMI_F34_WRITE_SIGNATURE;
+		rc = m_device.Write(m_f34.GetDataBase(), zeros, 2);
+		if (rc != 2)
+			return UPDATE_FAIL_WRITE_INITIAL_ZEROS;
+		
+		unsigned short signatureBlockCount = m_firmwareImage.GetBlv5SignatureSize() / m_blockSize ;
+		for(blockNum = 0 ; blockNum < signatureBlockCount ; blockNum++){
+			memcpy(blockWithCmd, block, m_blockSize);
+			blockWithCmd[m_blockSize] = cmd;
+
+			rc = m_device.Write(addr, blockWithCmd, m_blockSize + 1);
+			if (rc != m_blockSize + 1) {
+				fprintf(stderr, "failed to write block %d\n", blockNum);
+				return UPDATE_FAIL_WRITE_BLOCK;
+			}
+			block += m_blockSize;
+		}
+	}
+	Sleep(1000);
 
 	return UPDATE_SUCCESS;
 }

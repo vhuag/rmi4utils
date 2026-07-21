@@ -192,7 +192,7 @@ private:
 	int WriteFLDV7();
 	int WriteGlobalParametersV7();
 	int EnterFlashProgramming();
-	int WriteBlocks(unsigned char *block, unsigned short count, unsigned char cmd);
+	int WriteBlocks(unsigned char *block, unsigned short count, unsigned char cmd, bool needWriteSignature = false);
 	int WaitForIdle(int timeout_ms, bool readF34OnSucess = true);
 	int GetFirmwareSize() { return m_blockSize * m_fwBlockCount; }
 	int GetConfigSize() { return m_blockSize * m_configBlockCount; }
@@ -203,6 +203,7 @@ private:
 	int ReadSBLMSL();
 	int EraseSBLV10_1();
 	int WriteSBLV10_1();
+	bool IsHIDRMIType(enum hid_rmi_type hidRMIType) const { return m_device.GetHIDRMIType() == hidRMIType; }
 
 private:
 	RMIDevice & m_device;

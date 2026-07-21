@@ -237,6 +237,16 @@ int FirmwareImage::Initialize(const char * filename)
 	}
 
 	m_io = m_memBlock[RMI_IMG_IO_OFFSET];
+	m_hasBlv5Signature = (m_io & 0x10) >> 1;
+	fprintf(stdout, "Blv5 has signature? %d\n", m_hasBlv5Signature);
+	if (m_hasBlv5Signature) {
+		for (int i = 0; i < RMI_IMG_SIGNATURE_SIZE_SIZE; ++i) {
+			m_blv5SignatureSize |=
+				(static_cast<unsigned long>(m_memBlock[RMI_IMG_SIGNATURE_SIZE_OFFSET + i] & 0x00FF)
+				 << (8 * i));
+		}
+		fprintf(stdout, "Blv5 signature size : %ld\n", m_blv5SignatureSize);
+	}
 	m_bootloaderVersion = m_memBlock[RMI_IMG_BOOTLOADER_VERSION_OFFSET];
 	m_firmwareSize = extract_long(&m_memBlock[RMI_IMG_IMAGE_SIZE_OFFSET]);
 	m_configSize = extract_long(&m_memBlock[RMI_IMG_CONFIG_SIZE_OFFSET]);
@@ -291,21 +301,25 @@ void FirmwareImage::PrintHeaderInfo()
 	fprintf(stdout, "Bootloader Version:\t%d\n", m_bootloaderVersion);
 	fprintf(stdout, "Product ID:\t\t%s\n", m_productID);
 	fprintf(stdout, "Product Info:\t\t%d\n", m_productInfo);
+	fprintf(stdout, "Signature Size:\t\t%ld\n", m_blv5SignatureSize);
 	fprintf(stdout, "\n");
 }
 
 int FirmwareImage::VerifyImageMatchesDevice(unsigned long deviceFirmwareSize,
 						unsigned long deviceConfigSize)
 {
-	if (m_firmwareSize != deviceFirmwareSize) {
+	unsigned long firmwareSize = (m_hasBlv5Signature ? 
+		(m_firmwareSize - m_blv5SignatureSize) : m_firmwareSize);
+
+	if (firmwareSize != deviceFirmwareSize) {
 		fprintf(stderr, "Firmware image size verfication failed, size in image %ld did "
 			"not match device size %ld\n", m_firmwareSize, deviceFirmwareSize);
 		return UPDATE_FAIL_VERIFY_FIRMWARE_SIZE;
 	}
 
 	if (m_configSize != deviceConfigSize) {
-		fprintf(stderr, "Firmware image size verfication failed, size in image %ld did "
-			"not match device size %ld\n", m_firmwareSize, deviceConfigSize);
+		fprintf(stderr, "Config image size verfication failed, size in image %ld did "
+			"not match device size %ld\n", m_configSize, deviceConfigSize);
 		return UPDATE_FAIL_VERIFY_CONFIG_SIZE;
 	}
 	

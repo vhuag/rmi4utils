@@ -53,6 +53,12 @@
 #define CONFIG_ID_BYTES				4
 #define BUILD_ID_BYTES				3
 
+/*
+ * On Darfon TPRMI devices the F01 product ID field is only 6 bytes; the
+ * following bytes belong to the product/package information.
+ */
+#define RMI_DARFON_PRODUCT_ID_LEN		6
+
 #define RMI_F01_CMD_DEVICE_RESET	1
 #define RMI_F01_DEFAULT_RESET_DELAY_MS	100
 
@@ -114,6 +120,40 @@ int RMIDevice::QueryBasicProperties()
 			return rc;
 		}
 		m_productID[RMI_PRODUCT_ID_LENGTH] = '\0';
+
+		/*
+		 * On Darfon TPRMI devices the extra bytes read past the 6-byte
+		 * product ID field actually belong to the package information,
+		 * so keep only the base product ID.
+		 */
+		if (IsHIDRMIType(HID_PS2_RMI) &&
+		    RMI_DARFON_PRODUCT_ID_LEN < RMI_PRODUCT_ID_LENGTH)
+			m_productID[RMI_DARFON_PRODUCT_ID_LEN] = '\0';
+
+		if (!IsHIDRMIType(HID_I2C_RMI)) {
+			// Read the board sub-number from the TouchPad capabilities. 
+			unsigned char boardSubID = 0;
+			if (GetBoardSubID(&boardSubID) == 0) {
+				size_t idLen = strlen((char *)m_productID);
+				snprintf((char *)m_productID + idLen,
+				 sizeof(m_productID) - idLen, "-%03d", boardSubID);
+			} else {
+				fprintf(stderr, "Failed to read board sub ID\n");
+			}
+
+			unsigned long packratID = 0;
+			rc = GetPackratID(&packratID);
+			if (rc < 0) {
+				fprintf(stderr, "Failed to read the packrat id: %s\n", strerror(errno));
+				return rc;
+			}
+			m_buildID = packratID;
+		}
+		
+
+		fprintf(stderr, "Product ID: %s\n", m_productID);
+
+
 
 		prodInfoAddr = queryAddr + 6;
 		queryAddr += 10;
@@ -293,6 +333,13 @@ int RMIDevice::ScanPDT(int endFunc, int endPage)
 	unsigned int retryCount = 0;
 
 	maxPage = (unsigned int)((endPage < 0) ? RMI_DEVICE_MAX_PAGE : endPage);
+
+	if (IsHIDRMIType(HID_PS2_RMI)) {
+		maxPage = 1;
+		rc = EnsureRMIBackdoorMode(true);
+		if (rc < 0)
+			return rc;
+	}	
 
 	m_functionList.clear();
 

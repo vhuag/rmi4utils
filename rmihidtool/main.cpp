@@ -37,6 +37,8 @@
 
 #define RMI4UPDATE_GETOPTS      "hp:ir:w:foambd:ecnt:"
 
+#define PROTOCOL_HID_DEFAULT            "hid"
+
  enum rmihidtool_cmd {
 	RMIHIDTOOL_CMD_INTERACTIVE,
 	RMIHIDTOOL_CMD_READ,
@@ -60,6 +62,7 @@ void print_help(const char *prog_name)
 	fprintf(stdout, "\t-h, --help\t\t\t\tPrint this message\n");
 	fprintf(stdout, "\t-d, --device\t\t\t\thidraw device file associated with the device.\n");
 	fprintf(stdout, "\t-p, --protocol [protocol]\t\tSet which transport prototocl to use.\n");
+	fprintf(stdout, "\t\t\t\t\t%s\n", PROTOCOL_HID_DEFAULT);
 	fprintf(stdout, "\t-i, --interactive\t\t\tRun in interactive mode.\n");
 	fprintf(stdout, "\t-r, --read [address] [length]\t\tRead registers starting at the address.\n");
 	fprintf(stdout, "\t-w, --write [address] [length] [data]\tWrite registers starting at the address.\n");
@@ -239,6 +242,7 @@ int main(int argc, char ** argv)
 	char * start;
 	char * end;
 	int i = 0;
+	HIDDevice *hidDevice = NULL;
 
 	memset(&sig_cleanup_action, 0, sizeof(struct sigaction));
 	sig_cleanup_action.sa_handler = cleanup;
@@ -307,8 +311,9 @@ int main(int argc, char ** argv)
 		}
 	}
 
-	if (!strncasecmp("hid", protocol, 3)) {
-		device = new HIDDevice();
+	if (!strncasecmp(PROTOCOL_HID_DEFAULT, protocol, strlen(PROTOCOL_HID_DEFAULT))) {
+		hidDevice = new HIDDevice();
+		device = hidDevice;
 	} else {
 		fprintf(stderr, "Invalid Protocol: %s\n", protocol);
 		return -1;

@@ -36,7 +36,7 @@
 #define VERSION_MINOR		3
 #define VERSION_SUBMINOR	16
 
-#define RMI4UPDATE_GETOPTS	"hfd:t:pclvmi:"
+#define RMI4UPDATE_GETOPTS	"hfd:t:pclvmi:s"
 
 bool needDebugMessage; 
 char hidraw_node[64]={0};
@@ -53,6 +53,7 @@ void printHelp(const char *prog_name)
 	fprintf(stdout, "\t-v, --version\t\tPrint version number.\n");
 	fprintf(stdout, "\t-t, --device-type\tFilter by device type [touchpad or touchscreen].\n");
 	fprintf(stdout, "\t-i, --pid\tPid of device being updated.\n");
+	fprintf(stdout, "\t-s, --darfon-hid-over-ps2-styk\n\t\t\tUse Darfon HID-over-PS2 styk reflashing transport.\n");
 }
 
 void printVersion()
@@ -61,18 +62,10 @@ void printVersion()
 		VERSION_MAJOR, VERSION_MINOR, VERSION_SUBMINOR);
 }
 
-int GetFirmwareProps(const char * deviceFile, std::string &props, bool configid)
+int GetFirmwareProps(RMIDevice & rmidevice, std::string &props, bool configid)
 {
-	HIDDevice rmidevice;
 	int rc = UPDATE_SUCCESS;
 	std::stringstream ss;
-
-	rc = rmidevice.Open(deviceFile);
-	if (rc)
-		return rc;
-	
-	if (needDebugMessage)
-		rmidevice.m_hasDebug = true;
 
 	// Clear all interrupts before parsing to avoid unexpected interrupts.
 	rmidevice.ToggleInterruptMask(false);
@@ -157,6 +150,7 @@ int main(int argc, char **argv)
 		{"version", 0, NULL, 'v'},
 		{"device-type", 1, NULL, 't'},
 		{"pid", 1, NULL, 'i'},
+		{"darfon-hid-over-ps2-styk", 0, NULL, 's'},
 		{0, 0, 0, 0},
 	};
 	bool printFirmwareProps = false;
@@ -165,6 +159,7 @@ int main(int argc, char **argv)
 	needDebugMessage = false;
 	HIDDevice device;
 	enum RMIDeviceType deviceType = RMI_DEVICE_TYPE_ANY;
+	bool useDarfonHidOverPs2Styk = false;
 
 	while ((opt = getopt_long(argc, argv, RMI4UPDATE_GETOPTS, long_options, &index)) != -1) {
 		switch (opt) {
@@ -210,20 +205,44 @@ int main(int argc, char **argv)
 				}
 
 				break;
+			case 's':
+				useDarfonHidOverPs2Styk = true;
+				printf("Apply Darfon HID-over-PS2 styk transport for reflashing.\n");
+				break;
 			default:
 				break;
 
 		}
 	}
 
-	if (printFirmwareProps) {
-		std::string props;
-		
-		if (!deviceName) {
+	if (needDebugMessage) {
+		device.m_hasDebug = true;
+	}
+
+	if (useDarfonHidOverPs2Styk) {
+		device.SetHIDRMIType(HID_PS2_RMI);
+	}
+
+	if (deviceName) {
+		 rc = device.Open(deviceName);
+		 if (rc) {
+			fprintf(stderr, "%s: failed to initialize rmi device (%d): %s\n", argv[0], errno,
+				strerror(errno));
+			return 1;
+		}
+	} else {
+		if (printFirmwareProps && !deviceName) {
 			fprintf(stderr, "Specifiy which device to query\n");
 			return 1;
 		}
-		rc = GetFirmwareProps(deviceName, props, printConfigid);
+		if (!device.FindDevice(deviceType))
+			return 1;
+	}
+
+	if (printFirmwareProps) {
+		std::string props;
+		
+		rc = GetFirmwareProps(device, props, printConfigid);
 		if (rc) {
 			fprintf(stderr, "Failed to read properties from device: %s\n", update_err_to_string(rc));
 			return 1;
@@ -245,24 +264,21 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (deviceName) {
-		 rc = device.Open(deviceName);
-		 if (rc) {
-			fprintf(stderr, "%s: failed to initialize rmi device (%d): %s\n", argv[0], errno,
-				strerror(errno));
-			return 1;
-		}
-	} else {
-		if (!device.FindDevice(deviceType))
-			return 1;
-	}
-
-	if (needDebugMessage) {
-		device.m_hasDebug = true;
-	}
+	struct timespec total_start;
+	struct timespec total_end;
+	long long int total_duration_us = 0;
+	clock_gettime(CLOCK_MONOTONIC, &total_start);
 
 	RMI4Update update(device, image);
 	rc = update.UpdateFirmware(force, performLockdown);
+
+	clock_gettime(CLOCK_MONOTONIC, &total_end);
+	total_duration_us = diff_time(&total_start, &total_end);
+	long long duration_sec = total_duration_us / 1000000;
+	long long duration_min = duration_sec / 60;
+	long long duration_rem_sec = duration_sec % 60;
+	fprintf(stdout, "Reflashing process finished, time: %lld us. (%02lld minutes, %02lld seconds)\n",
+		total_duration_us, duration_min, duration_rem_sec);
 
 	if (rc != UPDATE_SUCCESS)
 	{

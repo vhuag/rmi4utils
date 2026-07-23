@@ -28,6 +28,8 @@
 #define RMI_IMG_CONFIG_SIZE_OFFSET		0x0C
 #define RMI_IMG_PACKAGE_ID_OFFSET		0x1A
 #define RMI_IMG_FW_BUILD_ID_OFFSET		0x50
+#define RMI_IMG_SIGNATURE_SIZE_OFFSET	0x54
+#define RMI_IMG_SIGNATURE_SIZE_SIZE		4
 
 #define RMI_IMG_PRODUCT_ID_OFFSET		0x10
 #define RMI_IMG_PRODUCT_INFO_OFFSET		0x1E
@@ -110,9 +112,11 @@ struct signature_info {
 class FirmwareImage
 {
 public:
-	FirmwareImage() : m_firmwareBuildID(0), m_packageID(0), m_firmwareData(NULL), m_configData(NULL), m_lockdownData(NULL),
-				m_memBlock(NULL), m_hasSignature(false), m_fldData(NULL), m_fldSize(0), m_globalparaData(NULL), m_globalparaSize(0),
-				m_firmwareVersion(0), m_hasFirmwareVersion(false)
+	FirmwareImage() : m_firmwareBuildID(0), m_packageID(0), m_firmwareData(NULL), m_configData(NULL),
+				m_flashConfigData(NULL), m_lockdownData(NULL), m_memBlock(NULL), m_cntrAddr(0),
+				m_hasSignature(false), m_blv5SignatureSize(0), m_hasBlv5Signature(false),
+				m_fldData(NULL), m_fldSize(0), m_globalparaData(NULL), m_globalparaSize(0),
+				m_firmwareVersion(0), m_hasFirmwareVersion(false), m_SBLData(NULL), m_SBLSize(0)
 	{}
 	int Initialize(const char * filename);
 	int VerifyImageMatchesDevice(unsigned long deviceFirmwareSize,
@@ -136,6 +140,8 @@ public:
 	bool IsImageHasFirmwareVersion() { return m_hasFirmwareVersion; }
 	
 	bool HasIO() { return m_io; }
+	bool HasSecureUpdate() { return m_hasBlv5Signature; }
+	unsigned long GetBlv5SignatureSize() { return m_blv5SignatureSize; }
 	bool HasSBL();
 	unsigned char * GetSBLData() { return m_SBLData; }
 	unsigned long GetSBLSize() { return m_SBLSize; }
@@ -168,6 +174,8 @@ private:
 	unsigned char * m_memBlock;
 	unsigned long m_cntrAddr;	// BL_V7
 	bool m_hasSignature;
+	unsigned long m_blv5SignatureSize;
+	bool m_hasBlv5Signature;
 	unsigned char * m_fldData;
 	unsigned long m_fldSize;
 	unsigned char * m_globalparaData;

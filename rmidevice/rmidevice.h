@@ -33,11 +33,16 @@ enum RMIDeviceType {
 	RMI_DEVICE_TYPE_TOUCHSCREEN,
 };
 
+enum hid_rmi_type {
+	HID_I2C_RMI = 0,
+	HID_PS2_RMI,
+};
+
 class RMIDevice
 {
 public:
 	RMIDevice() : m_functionList(), m_sensorID(0), m_bCancel(false), m_bytesPerReadRequest(0), m_page(-1),
-		      m_deviceType(RMI_DEVICE_TYPE_TOUCHPAD)
+		      m_deviceType(RMI_DEVICE_TYPE_TOUCHPAD), m_hidRMIType(HID_I2C_RMI)
 	{ m_hasDebug = false; }
 	virtual ~RMIDevice() {}
 	virtual int Open(const char * filename) = 0;
@@ -63,6 +68,23 @@ public:
 	int GetFirmwareVersionMinor() { return m_firmwareVersionMinor; }
 	virtual int QueryBasicProperties();
 	char *GetProductID() { return (char *)m_productID; }
+
+	/*
+	 * Read the board sub-number (the "-<n>" suffix of the product ID).
+	 * Returns 0 on success. Default: unsupported.
+	 */
+	virtual int GetBoardSubID(unsigned char *boardSubID)
+	{ (void)boardSubID; return -1; }
+
+	virtual int GetPackratID(unsigned long *packratID)
+	{ (void)packratID; return -1; }
+
+	/*
+	 * Allow transport-specific setup before scans or reads that require a
+	 * special access mode. Default: no-op.
+	 */
+	virtual int EnsureRMIBackdoorMode(bool force)
+	{ (void)force; return 0; }
 	
 	int SetRMIPage(unsigned char page);
 	
@@ -82,6 +104,10 @@ public:
 
 	virtual bool FindDevice(enum RMIDeviceType type = RMI_DEVICE_TYPE_ANY) = 0;
 	enum RMIDeviceType GetDeviceType() { return m_deviceType; }
+
+	void SetHIDRMIType(enum hid_rmi_type transportType) { m_hidRMIType = transportType; }
+	enum hid_rmi_type GetHIDRMIType() const { return m_hidRMIType; }
+	bool IsHIDRMIType(enum hid_rmi_type hidRMIType) const { return m_hidRMIType == hidRMIType; }
 
 	bool m_hasDebug;
 
@@ -120,6 +146,8 @@ protected:
 	unsigned int m_numInterruptRegs;
 
 	enum RMIDeviceType m_deviceType;
+
+	hid_rmi_type m_hidRMIType;
 };
 
 /* Utility Functions */
